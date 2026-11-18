@@ -213,10 +213,29 @@ private struct SetupTab: View {
                         .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
                 }
 
-                step(3, "Log in to each account",
+                step(3, "Account switching in VS Code",
+                     "Sets the Claude Code extension's `claudeCode.claudeProcessWrapper` setting to a small wrapper that applies the active account. Your editor settings keep their comments and formatting, and a backup is saved. After switching accounts, start a new Claude conversation (or run “Developer: Reload Window”).") {
+                    if Integration.editorSettingsFiles.isEmpty {
+                        Text("No VS Code-based editor found.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(Integration.editorSettingsFiles, id: \.path) { editor in
+                        HStack {
+                            Text(editor.name)
+                            Spacer()
+                            if Integration.vscodeConfigured(editor.path) {
+                                Label("Configured", systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                                Button("Remove") { state.setVSCode(editor.path, enabled: false) }
+                            } else {
+                                Button("Configure") { state.setVSCode(editor.path, enabled: true) }
+                            }
+                        }
+                    }
+                }
+
+                step(4, "Log in to each account",
                      "In the Accounts tab, click “Log in…” next to Work and Backup, then type /login in the Terminal window that opens.") { EmptyView() }
 
-                step(4, "Test it", "Sends a sample of each notification for the active account.") {
+                step(5, "Test it", "Sends a sample of each notification for the active account.") {
                     HStack {
                         ForEach(HookEvent.allCases) { e in
                             Button { state.sendTest(e, account: state.activeAccount) } label: {
@@ -230,7 +249,7 @@ private struct SetupTab: View {
                     Label(err, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
                 }
 
-                Text("The VS Code extension and Claude desktop app don't go through the `claude` wrapper, so they keep using the default account (~/.claude). Hooks still notify for them.")
+                Text("The Claude desktop app always uses the default account (~/.claude). Hooks still notify for it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 4)

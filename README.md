@@ -32,8 +32,9 @@ Open the menu bar icon → **Settings** → **Setup** and work through the steps
 0. **Allow notifications.** macOS asks on first launch. If you missed the prompt, use **Open Notification Settings**. Until you allow them, you get plain AppleScript banners (shown as "Script Editor"). Sounds play either way.
 1. **Install hooks.** This adds `Stop` and `Notification` hooks to each account's `settings.json`. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
 2. **Install shell integration.** This installs a `claude` wrapper in `~/.claude-companion/bin` and adds one line to `~/.zshrc` to put it on your PATH. Open a new terminal tab afterwards.
-3. **Log in to each account.** Go to Settings → Accounts → **Log in…** and type `/login` in the Terminal window that opens.
-4. **Test.** The buttons send sample notifications.
+3. **VS Code** (optional). **Configure** sets the Claude Code extension's `claudeCode.claudeProcessWrapper` setting so the extension follows the active account too. It also works for Cursor, Windsurf and VS Code Insiders. Your editor settings keep their comments and formatting, and a backup is saved.
+4. **Log in to each account.** Go to Settings → Accounts → **Log in…** and type `/login` in the Terminal window that opens.
+5. **Test.** The buttons send sample notifications.
 
 Default accounts:
 
@@ -47,7 +48,7 @@ You can rename accounts, change their directories, or add more in Settings → A
 
 ## How it works
 
-**Account switching.** Each account is a separate Claude Code config directory (`CLAUDE_CONFIG_DIR`), so it has its own login, settings and history. The menu bar writes the active directory to `~/.claude-companion/active-config-dir`. The `claude` wrapper reads that file, exports `CLAUDE_CONFIG_DIR`, and runs the real `claude`. The Personal account (`~/.claude`) leaves the variable unset. The wrapper does nothing if you've set `CLAUDE_CONFIG_DIR` yourself or set `CLAUDE_COMPANION_BYPASS=1`.
+**Account switching.** Each account is a separate Claude Code config directory (`CLAUDE_CONFIG_DIR`), so it has its own login, settings and history. The menu bar writes the active directory to `~/.claude-companion/active-config-dir`. The `claude` wrapper reads that file, exports `CLAUDE_CONFIG_DIR`, and runs the real `claude`. The Personal account (`~/.claude`) leaves the variable unset. The wrapper does nothing if you've set `CLAUDE_CONFIG_DIR` yourself or set `CLAUDE_COMPANION_BYPASS=1`. In VS Code, the extension runs `claude-vscode-wrapper <bundled claude> <args>`. That wrapper applies the same rule and then runs the bundled binary.
 
 **Notifications.** The hooks run `~/.claude-companion/bin/claude-companion-hook`, a tiny shim that calls the app binary in CLI mode. The app rewrites the shim on every launch, so moving the app doesn't break it. The CLI reads the hook JSON from stdin and passes the event to the running app, which plays the account's sound and posts the notification. If the app isn't running, the CLI shows an AppleScript notification itself. Hooks exit 0 in well under a second and never block Claude.
 
@@ -65,14 +66,14 @@ APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
 
 ## Limitations
 
-- The **VS Code extension and the Claude desktop app** don't go through the `claude` wrapper, so they always use the Personal account (`~/.claude`). Notifications still work for them.
-- **Sessions that are already running** keep their account. Switching only affects new sessions.
+- The **Claude desktop app** always uses the Personal account (`~/.claude`). Notifications still work for it.
+- **Sessions that are already running** keep their account. Switching only affects new terminal sessions and new VS Code conversations.
 - **Costs are estimates** at API list prices. Subscription plans (Pro or Max) aren't billed per token, and your plan's actual usage-limit percentage isn't stored locally. Use the numbers to compare accounts and spot heavy sessions.
 - Model prices are hard-coded in `Sources/ClaudeCompanion/Usage.swift`. Update them when pricing changes.
 
 ## Uninstall
 
-1. Settings → Setup → **Remove hooks**
+1. Settings → Setup → **Remove hooks**, and **Remove** next to each configured editor
 2. Delete the `# Claude Companion` line from `~/.zshrc`
 3. Quit the app, then delete `/Applications/Claude Companion.app` and `~/.claude-companion`
 

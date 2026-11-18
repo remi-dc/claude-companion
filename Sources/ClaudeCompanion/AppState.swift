@@ -136,6 +136,14 @@ final class AppState: ObservableObject {
         statusTick += 1
     }
 
+    func setVSCode(_ path: String, enabled: Bool) {
+        lastError = nil
+        do {
+            if enabled { try Integration.configureVSCode(path) } else { try Integration.unconfigureVSCode(path) }
+        } catch { lastError = error.localizedDescription }
+        statusTick += 1
+    }
+
     func installShellIntegration() {
         lastError = nil
         Integration.installWrapper()
