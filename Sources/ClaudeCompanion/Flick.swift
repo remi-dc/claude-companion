@@ -1,8 +1,18 @@
+import AppKit
 import SwiftUI
 
 /// Flick's mood, derived from what Claude is doing across your sessions.
 enum FlickMood: String, CaseIterable {
     case idle, working, needs, done, sleep
+
+    /// Slow moods need few frames; the flicker of "working" needs more.
+    var framesPerSecond: Double {
+        switch self {
+        case .idle, .sleep: return 12
+        case .needs, .done: return 20
+        case .working: return 24
+        }
+    }
 
     var label: String {
         switch self {
@@ -22,10 +32,12 @@ struct FlickView: View {
     var size: CGFloat = 64
     var animated = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Only animate while the hosting window is actually on screen (closed popovers and windows cost nothing).
+    @State private var onScreen = false
 
     var body: some View {
-        let still = !animated || reduceMotion
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still)) { timeline in
+        let still = !animated || reduceMotion || !onScreen
+        let view = TimelineView(.animation(minimumInterval: 1.0 / mood.framesPerSecond, paused: still)) { timeline in
             Canvas { ctx, canvasSize in
                 FlickRenderer.draw(&ctx, size: canvasSize, mood: mood,
                                    t: still ? 1.0 : timeline.date.timeIntervalSinceReferenceDate)
@@ -34,6 +46,52 @@ struct FlickView: View {
         .frame(width: size, height: size * 110 / 120)
         .accessibilityElement()
         .accessibilityLabel("Flick, \(mood.label)")
+        if animated {
+            view.background(WindowVisibilityReader(visible: $onScreen))
+        } else {
+            view
+        }
+    }
+}
+
+/// Reports whether the view's window is visible on screen, using AppKit's occlusion state.
+struct WindowVisibilityReader: NSViewRepresentable {
+    @Binding var visible: Bool
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.onChange = { isVisible in
+            DispatchQueue.main.async { if visible != isVisible { visible = isVisible } }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingView, context: Context) {}
+
+    final class TrackingView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var observers: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            guard let window else { onChange?(false); return }
+            for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.willCloseNotification,
+                         NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] note in
+                    self?.report(closing: note.name == NSWindow.willCloseNotification)
+                })
+            }
+            report(closing: false)
+        }
+
+        private func report(closing: Bool) {
+            guard let window, !closing else { onChange?(false); return }
+            onChange?(window.isVisible && window.occlusionState.contains(.visible))
+        }
+
+        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     }
 }
 

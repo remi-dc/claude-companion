@@ -114,22 +114,32 @@ struct AccountUsage {
 
 // MARK: Scanner
 
-/// Reads Claude Code's JSONL transcripts under `<configDir>/projects`. Results are cached
-/// per file (keyed by size + mtime) so refreshes only re-parse what changed.
+/// Reads Claude Code's JSONL transcripts under `<configDir>/projects`.
+/// Transcripts are append-only, so each file is read once and then only its new lines
+/// on later scans. Lines are parsed one at a time inside an autorelease pool to keep memory flat.
 final class UsageScanner {
-    private var cache: [String: (stamp: String, entries: [UsageEntry])] = [:]
+    private struct FileState {
+        var size: Int
+        var mtime: Date
+        var offset: UInt64          // bytes consumed so far (always just after a newline)
+        var entries: [UsageEntry]
+    }
+    private var cache: [String: FileState] = [:]
     private let queue = DispatchQueue(label: "usage-scanner", qos: .utility)
     static let lookbackDays = 35
 
     func scan(_ accounts: [Account], completion: @escaping ([String: AccountUsage]) -> Void) {
         queue.async {
             var result: [String: AccountUsage] = [:]
-            for a in accounts { result[a.id] = self.scanAccount(a) }
+            var seenPaths = Set<String>()
+            for a in accounts { result[a.id] = self.scanAccount(a, seen: &seenPaths) }
+            // Forget files that were deleted or aged out.
+            self.cache = self.cache.filter { seenPaths.contains($0.key) }
             DispatchQueue.main.async { completion(result) }
         }
     }
 
-    private func scanAccount(_ account: Account) -> AccountUsage {
+    private func scanAccount(_ account: Account, seen seenPaths: inout Set<String>) -> AccountUsage {
         let fm = FileManager.default
         let root = URL(fileURLWithPath: account.projectsDir)
         let cutoff = Date().addingTimeInterval(-Double(Self.lookbackDays) * 86400)
@@ -141,15 +151,26 @@ final class UsageScanner {
         for case let url as URL in en where url.pathExtension == "jsonl" {
             let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             guard let mtime = vals?.contentModificationDate, mtime >= cutoff else { continue }
-            let stamp = "\(vals?.fileSize ?? 0)-\(mtime.timeIntervalSince1970)"
-            let entries: [UsageEntry]
-            if let c = cache[url.path], c.stamp == stamp {
-                entries = c.entries
+            let size = vals?.fileSize ?? 0
+            let path = url.path
+            seenPaths.insert(path)
+
+            var state: FileState
+            if let cached = cache[path], cached.size == size, cached.mtime == mtime {
+                state = cached                                       // unchanged
+            } else if let cached = cache[path], size > cached.size {
+                state = cached                                       // grew: read only the new lines
+                let (more, offset) = Self.parse(url, from: cached.offset)
+                state.entries += more
+                state.offset = offset
+                state.size = size
+                state.mtime = mtime
             } else {
-                entries = Self.parse(url)
-                cache[url.path] = (stamp, entries)
+                let (entries, offset) = Self.parse(url, from: 0)    // new or rewritten: read it all
+                state = FileState(size: size, mtime: mtime, offset: offset, entries: entries)
             }
-            for e in entries where e.date >= cutoff && seen.insert(e.key).inserted { all.append(e) }
+            cache[path] = state
+            for e in state.entries where e.date >= cutoff && seen.insert(e.key).inserted { all.append(e) }
         }
         all.sort { $0.date < $1.date }
         return AccountUsage(entries: all)
@@ -163,44 +184,56 @@ final class UsageScanner {
     private static let iso = ISO8601DateFormatter()
     private static let needle = Data("\"usage\"".utf8)
 
-    static func parse(_ url: URL) -> [UsageEntry] {
-        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return [] }
+    /// Parses complete lines from `offset` to the last newline. Returns the entries and the new offset.
+    static func parse(_ url: URL, from offset: UInt64) -> ([UsageEntry], UInt64) {
+        guard let fh = try? FileHandle(forReadingFrom: url) else { return ([], offset) }
+        defer { try? fh.close() }
+        guard (try? fh.seek(toOffset: offset)) != nil, let data = try? fh.readToEnd(), !data.isEmpty,
+              let lastNewline = data.lastIndex(of: 0x0A) else { return ([], offset) }
+
         var out: [UsageEntry] = []
-        for line in data.split(separator: 0x0A) where line.range(of: needle) != nil {
-            guard let obj = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
-                  obj["type"] as? String == "assistant",
-                  let msg = obj["message"] as? [String: Any],
-                  let usage = msg["usage"] as? [String: Any],
-                  let ts = obj["timestamp"] as? String,
-                  let date = isoFrac.date(from: ts) ?? iso.date(from: ts) else { continue }
-            let model = msg["model"] as? String ?? "unknown"
-            if model == "<synthetic>" { continue }
-
-            func int(_ d: [String: Any]?, _ k: String) -> Int { (d?[k] as? NSNumber)?.intValue ?? 0 }
-            let input = int(usage, "input_tokens")
-            let output = int(usage, "output_tokens")
-            let cacheRead = int(usage, "cache_read_input_tokens")
-            let cacheWrite = int(usage, "cache_creation_input_tokens")
-            let cc = usage["cache_creation"] as? [String: Any]
-            let w1h = int(cc, "ephemeral_1h_input_tokens")
-            let w5m = cc == nil ? cacheWrite : int(cc, "ephemeral_5m_input_tokens")
-
-            var cost = 0.0
-            if let p = Pricing.price(for: model) {
-                cost = (Double(input) * p.input + Double(output) * p.output + Double(cacheRead) * p.cacheRead
-                        + Double(w5m) * p.cacheWrite5m + Double(w1h) * p.cacheWrite1h) / 1_000_000
-                if usage["speed"] as? String == "fast" { cost *= 2 }
+        let complete = data[data.startIndex...lastNewline]
+        for line in complete.split(separator: 0x0A) where line.range(of: needle) != nil {
+            autoreleasepool {
+                if let entry = parseLine(line, url: url) { out.append(entry) }
             }
-
-            let id = msg["id"] as? String ?? UUID().uuidString
-            let req = obj["requestId"] as? String ?? ""
-            let cwd = obj["cwd"] as? String ?? url.deletingLastPathComponent().lastPathComponent
-            out.append(UsageEntry(key: id + ":" + req, date: date, model: model,
-                                  project: (cwd as NSString).lastPathComponent,
-                                  input: input, output: output, cacheWrite: cacheWrite, cacheRead: cacheRead,
-                                  cost: cost))
         }
-        return out
+        return (out, offset + UInt64(lastNewline - data.startIndex + 1))
+    }
+
+    private static func parseLine(_ line: Data.SubSequence, url: URL) -> UsageEntry? {
+        guard let obj = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+              obj["type"] as? String == "assistant",
+              let msg = obj["message"] as? [String: Any],
+              let usage = msg["usage"] as? [String: Any],
+              let ts = obj["timestamp"] as? String,
+              let date = isoFrac.date(from: ts) ?? iso.date(from: ts) else { return nil }
+        let model = msg["model"] as? String ?? "unknown"
+        if model == "<synthetic>" { return nil }
+
+        func int(_ d: [String: Any]?, _ k: String) -> Int { (d?[k] as? NSNumber)?.intValue ?? 0 }
+        let input = int(usage, "input_tokens")
+        let output = int(usage, "output_tokens")
+        let cacheRead = int(usage, "cache_read_input_tokens")
+        let cacheWrite = int(usage, "cache_creation_input_tokens")
+        let cc = usage["cache_creation"] as? [String: Any]
+        let w1h = int(cc, "ephemeral_1h_input_tokens")
+        let w5m = cc == nil ? cacheWrite : int(cc, "ephemeral_5m_input_tokens")
+
+        var cost = 0.0
+        if let p = Pricing.price(for: model) {
+            cost = (Double(input) * p.input + Double(output) * p.output + Double(cacheRead) * p.cacheRead
+                    + Double(w5m) * p.cacheWrite5m + Double(w1h) * p.cacheWrite1h) / 1_000_000
+            if usage["speed"] as? String == "fast" { cost *= 2 }
+        }
+
+        let id = msg["id"] as? String ?? UUID().uuidString
+        let req = obj["requestId"] as? String ?? ""
+        let cwd = obj["cwd"] as? String ?? url.deletingLastPathComponent().lastPathComponent
+        return UsageEntry(key: id + ":" + req, date: date, model: model,
+                          project: (cwd as NSString).lastPathComponent,
+                          input: input, output: output, cacheWrite: cacheWrite, cacheRead: cacheRead,
+                          cost: cost)
     }
 }
 
