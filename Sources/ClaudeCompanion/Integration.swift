@@ -223,18 +223,64 @@ enum Integration {
         Paths.ensureDir(account.expandedConfigDir)
         let quoted = "'" + account.expandedConfigDir.replacingOccurrences(of: "'", with: "'\\''") + "'"
         let env = account.isDefaultDir ? "unset CLAUDE_CONFIG_DIR" : "export CLAUDE_CONFIG_DIR=\(quoted)"
+        // A .command file doesn't load ~/.zshrc, where many people put Claude Code on their PATH
+        // (npm, nvm, conda…), so use the full path we found.
+        let launch: String
+        if let claude = findClaude() {
+            launch = "'" + claude.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        } else {
+            launch = """
+            echo "Claude Code wasn't found on this Mac."
+            echo "Install it (https://docs.anthropic.com/en/docs/claude-code), then click Log in… again."
+            """
+        }
         let script = """
-        #!/bin/zsh -l
+        #!/bin/zsh
         \(env)
         export CLAUDE_COMPANION_BYPASS=1
         echo "Claude Companion — config dir: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
         echo "Type /login inside Claude to sign in to this account."
         echo
-        claude
+        \(launch)
         """
         let path = Paths.companionDir + "/login-\(account.id).command"
         writeExecutable(script, to: path)
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    /// Finds the real Claude Code executable: common install locations first, then the PATH of the
+    /// user's interactive shell (which loads ~/.zshrc). Our own `claude` wrapper is skipped.
+    static func findClaude(checkCommonLocations: Bool = true) -> String? {
+        let fm = FileManager.default
+        let h = Paths.home
+        var candidates = [h + "/.local/bin/claude", h + "/.claude/local/claude", "/opt/homebrew/bin/claude",
+                          "/usr/local/bin/claude", h + "/.npm-global/bin/claude", h + "/.bun/bin/claude",
+                          h + "/.volta/bin/claude"]
+        if let versions = try? fm.contentsOfDirectory(atPath: h + "/.nvm/versions/node") {
+            candidates += versions.sorted().reversed().map { h + "/.nvm/versions/node/\($0)/bin/claude" }
+        }
+        if checkCommonLocations, let found = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) { return found }
+
+        // Ask the user's shell for its PATH, with their startup files loaded.
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: shell)
+        p.arguments = ["-ilc", "printf '\\n__PATH__%s\\n' \"$PATH\""]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        p.standardInput = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let deadline = Date().addingTimeInterval(6)
+        while p.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if p.isRunning { p.terminate(); return nil }
+        let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        guard let line = text.split(separator: "\n").last(where: { $0.hasPrefix("__PATH__") }) else { return nil }
+        for dir in line.dropFirst("__PATH__".count).split(separator: ":") where !dir.isEmpty && String(dir) != Paths.binDir {
+            let path = String(dir) + "/claude"
+            if fm.isExecutableFile(atPath: path) { return path }
+        }
+        return nil
     }
 
     private static func writeExecutable(_ s: String, to path: String) {
