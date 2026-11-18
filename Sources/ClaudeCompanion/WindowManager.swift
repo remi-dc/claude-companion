@@ -19,11 +19,11 @@ final class WindowManager {
         switch id {
         case "settings":
             (title, size, view) = ("Claude Companion Settings", NSSize(width: 720, height: 540),
-                                   AnyView(SettingsView().environmentObject(state).tint(Ember.accent)))
+                                   AnyView(SettingsView().environmentObject(state).environmentObject(state.updater).tint(Ember.accent)))
         case "popover":
             // Same view as the menu bar popover, in a window (handy for screenshots and demos).
             (title, size, view) = ("Claude Companion", NSSize(width: 348, height: 640),
-                                   AnyView(MenuBarView().environmentObject(state).background(.regularMaterial)))
+                                   AnyView(MenuBarView().environmentObject(state).environmentObject(state.updater).background(.regularMaterial)))
         default:
             (title, size, view) = ("Usage Dashboard", NSSize(width: 940, height: 760),
                                    AnyView(DashboardView().environmentObject(state).tint(Ember.accent)))

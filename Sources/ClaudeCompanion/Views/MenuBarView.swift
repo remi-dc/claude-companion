@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var updater: Updater
     @Namespace private var accountSelection
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -13,6 +14,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            updateBanner
             setupBanner
             accountSwitcher
             windowCard
@@ -62,6 +64,51 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .help(state.config.paused ? "Resume notifications" : "Pause notifications")
             .accessibilityLabel(state.config.paused ? "Resume notifications" : "Pause notifications")
+        }
+    }
+
+    // MARK: Update
+
+    @ViewBuilder private var updateBanner: some View {
+        if let release = updater.available {
+            let busy = updater.phase == .downloading || updater.phase == .installing
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles").foregroundStyle(Ember.accent)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Version \(release.version) is available")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(state.config.friendlyMessages ? "Flick learned some new tricks." : "You have \(Updater.currentVersion).")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    if busy {
+                        ProgressView().controlSize(.small)
+                        Text(updater.phase == .downloading ? "Downloading…" : "Installing…")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    } else {
+                        Button("Later") { withAnimation { updater.skip() } }
+                            .buttonStyle(.borderless).font(.system(size: 12))
+                        Button("Update") { Task { await updater.install() } }
+                            .buttonStyle(EmberButtonStyle())
+                    }
+                }
+                let firstNote = release.notes.split(separator: "\n").first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                if let firstNote, !busy {
+                    Text(String(firstNote).replacingOccurrences(of: "**", with: ""))
+                        .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
+                }
+                if case .failed(let message) = updater.phase {
+                    HStack(spacing: 6) {
+                        Text(message).font(.system(size: 11)).foregroundStyle(.red)
+                        Link("Release page", destination: release.pageURL).font(.system(size: 11))
+                    }
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Ember.card))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Ember.accent.opacity(0.35)))
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 

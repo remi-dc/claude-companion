@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
     @Published var now = Date()
 
     let notifier = Notifier()
+    let updater = Updater()
     private let scanner = UsageScanner()
     private var timer: Timer?
     private var iconTimer: Timer?
@@ -56,6 +57,7 @@ final class AppState: ObservableObject {
 
         refreshUsage()
         refreshPermission()
+        updater.start()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshUsage(); self?.refreshPermission(); self?.now = Date() }
         }

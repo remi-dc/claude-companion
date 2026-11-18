@@ -168,11 +168,33 @@ private struct SoundsTab: View {
 
 private struct SetupTab: View {
     @EnvironmentObject var state: AppState
+    @EnvironmentObject var updater: Updater
 
     var body: some View {
         let _ = state.statusTick
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 10) {
+                    Text("Claude Companion \(Updater.currentVersion)").font(.headline)
+                    Spacer()
+                    switch updater.phase {
+                    case .checking:
+                        ProgressView().controlSize(.small)
+                    case .failed(let message):
+                        Text(message).font(.caption).foregroundStyle(.red)
+                    default:
+                        if let r = updater.available {
+                            Text("Version \(r.version) is available").font(.caption).foregroundStyle(Ember.accent)
+                            Button("Update") { Task { await updater.install() } }
+                        } else if updater.lastChecked != nil {
+                            Text("Up to date").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Button("Check for updates") { Task { await updater.check(userInitiated: true) } }
+                        .disabled(updater.phase == .checking)
+                }
+                Divider()
+
                 step(0, "Allow notifications",
                      "macOS asks the first time the app launches. If you dismissed it, turn on Claude Companion in System Settings → Notifications. Until then you get plain AppleScript banners (listed as Script Editor); sounds play either way.") {
                     HStack {

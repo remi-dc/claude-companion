@@ -20,6 +20,24 @@ enum Entry {
             MainActor.assumeIsolated { AppIconView.renderIconset(to: args[2]) }
             exit(0)
         }
+        // `ClaudeCompanion check-update` — compares this build with the latest GitHub release.
+        if args.count > 1 && args[1] == "check-update" {
+            let done = DispatchSemaphore(value: 0)
+            let feed = URL(string: ProcessInfo.processInfo.environment["CLAUDE_COMPANION_UPDATE_URL"]
+                           ?? "https://api.github.com/repos/\(Updater.repo)/releases/latest")!
+            Task.detached {
+                let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+                do {
+                    if let r = try await Updater.fetchLatest(from: feed) {
+                        print("installed \(current), latest \(r.version): \(Updater.isNewer(r.version, than: current) ? "update available" : "up to date")")
+                        print("download: \(r.zipURL.absoluteString)")
+                    } else { print("installed \(current), no release found") }
+                } catch { print("check failed: \(error.localizedDescription)") }
+                done.signal()
+            }
+            done.wait()
+            exit(0)
+        }
         if args.count > 1 && args[1] == "usage" {
             printUsage()
             exit(0)

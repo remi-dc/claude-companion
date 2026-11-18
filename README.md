@@ -21,7 +21,9 @@ curl -fsSL https://raw.githubusercontent.com/remi-dc/claude-companion/main/insta
 
 It downloads the latest release (a universal app for Apple Silicon and Intel), installs it in `/Applications` and launches it. Then click the chat-bubble icon in the menu bar and **Install** in the orange banner. That's it.
 
-You need macOS 14 (Sonoma) or later and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You can [read the script](install.sh) before running it. To update, run the same command again.
+You need macOS 14 (Sonoma) or later and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You can [read the script](install.sh) before running it.
+
+**Updates are built in.** The app checks GitHub for a new release every few hours. When there is one, a banner in the popover offers **Update**: it downloads the new version, checks it, swaps it in and relaunches. You can also use Settings › Setup › **Check for updates**. The check is one anonymous request to GitHub's public API.
 
 > **Why a Terminal command and not a download link?** The app isn't notarized by Apple (that needs a paid developer account), so macOS blocks it when it's downloaded in a browser. Downloads made with `curl` don't get that block.
 
@@ -73,10 +75,19 @@ The app binary has a few CLI subcommands:
 ```sh
 APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
 "$APP" usage              # per-account usage summary in the terminal
+"$APP" check-update       # compare with the latest GitHub release
 "$APP" open dashboard     # show the dashboard (or: open settings)
 "$APP" open popover       # show the menu bar popover in a regular window (handy for screenshots)
 "$APP" render-icon <dir>  # write the app icon PNGs (used by build.sh)
 ```
+
+## Publishing a release (maintainers)
+
+```sh
+./scripts/release.sh 1.2.0 "What's new, in one line"
+```
+
+It bumps the version, builds the universal app, commits, pushes and creates the GitHub release. Every running copy then offers the update within a few hours. It needs the [GitHub CLI](https://cli.github.com) (`gh auth login`).
 
 ## Troubleshooting
 

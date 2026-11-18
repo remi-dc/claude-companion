@@ -7,6 +7,7 @@ struct CompanionApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(state)
+                .environmentObject(state.updater)
         } label: {
             let needs = state.liveSessions.first { $0.mood == .needs }
             Image(nsImage: MenuBarIcon.image(
