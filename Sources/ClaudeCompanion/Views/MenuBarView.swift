@@ -13,6 +13,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            setupBanner
             accountSwitcher
             windowCard
             HStack(spacing: 10) {
@@ -61,6 +62,33 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .help(state.config.paused ? "Resume notifications" : "Pause notifications")
             .accessibilityLabel(state.config.paused ? "Resume notifications" : "Pause notifications")
+        }
+    }
+
+    // MARK: Setup warning
+
+    /// Without hooks Claude Code never tells us anything, so say so loudly.
+    @ViewBuilder private var setupBanner: some View {
+        let _ = state.statusTick
+        let missing = state.config.accounts.filter { !Integration.hooksUpToDate(for: $0) }
+        if !missing.isEmpty {
+            let anyInstalled = missing.contains { Integration.hooksInstalled(for: $0) }
+            HStack(spacing: 10) {
+                Image(systemName: "bolt.slash.fill").foregroundStyle(Ember.accent)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(anyInstalled ? "Hooks need an update" : "Notifications aren't set up yet")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(missing.map(\.name).joined(separator: ", ") + (anyInstalled ? ": update to see when Claude is working." : ": Claude can't reach the app."))
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+                Button(anyInstalled ? "Update" : "Install") { state.installAllHooks() }
+                    .buttonStyle(EmberButtonStyle())
+            }
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Ember.alert))
+            .transition(.opacity)
         }
     }
 
