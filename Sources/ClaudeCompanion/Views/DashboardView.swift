@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Categorical palette (fixed order; light/dark steps chosen per surface, CVD-validated).
 enum SeriesPalette {
@@ -96,6 +97,7 @@ struct DashboardView: View {
             .padding(24)
         }
         .background(Ember.window)
+        .modifier(FlickThemed())
         .onAppear { state.refreshUsage() }
     }
 
@@ -131,6 +133,8 @@ struct DashboardView: View {
                 Text("Updated \(t.formatted(date: .omitted, time: .shortened))")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Button { exportCSV() } label: { Label("Export CSV", systemImage: "square.and.arrow.up") }
+                .help("Export the usage shown here (period and account) as a CSV file")
             Button { state.refreshUsage() } label: {
                 if state.isScanning { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.clockwise") }
             }
@@ -238,6 +242,28 @@ struct DashboardView: View {
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ember.cardRaised))
+    }
+
+    /// Writes the usage in the current scope and period to a CSV file the user picks.
+    private func exportCSV() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        let scopeName = scopedAccounts.count == 1 ? scopedAccounts[0].name : "All"
+        panel.nameFieldStringValue = "Claude usage - \(scopeName) - \(days)d.csv"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        func field(_ s: String) -> String {
+            s.contains(where: { ",\"\n".contains($0) }) ? "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : s
+        }
+        let iso = ISO8601DateFormatter()
+        var lines = ["date,account,project,session,model,input_tokens,output_tokens,cache_write_tokens,cache_read_tokens,cost_usd"]
+        for account in scopedAccounts {
+            for e in state.usage[account.id]?.since(rangeStart) ?? [] {
+                lines.append([iso.string(from: e.date), field(account.name), field(e.project), e.session, e.model,
+                              "\(e.input)", "\(e.output)", "\(e.cacheWrite)", "\(e.cacheRead)",
+                              String(format: "%.6f", e.cost)].joined(separator: ","))
+            }
+        }
+        try? (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
     private var scopeIsAll: Bool { if case .all = scope { return true } else { return false } }

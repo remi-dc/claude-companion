@@ -25,6 +25,46 @@ enum FlickMood: String, CaseIterable {
     }
 }
 
+/// Flick's colors: a top-to-bottom flame gradient and a warm inner glow.
+struct FlickPalette: Equatable {
+    var top: Color, mid: Color, bottom: Color, glow: Color
+
+    static let ember = FlickPalette(top: Color(hex: 0xF6A75E), mid: Color(hex: 0xEB8048), bottom: Color(hex: 0xDA6A3E), glow: Color(hex: 0xFFC58F))
+    static let glacier = FlickPalette(top: Color(hex: 0xA6D8F7), mid: Color(hex: 0x62AEE8), bottom: Color(hex: 0x3B80C6), glow: Color(hex: 0xDCF0FF))
+    static let mint = FlickPalette(top: Color(hex: 0xA3E6C6), mid: Color(hex: 0x56C99E), bottom: Color(hex: 0x2F9D77), glow: Color(hex: 0xD8F8EA))
+
+    /// A palette built from any color (used for "match the active account").
+    static func from(_ color: Color) -> FlickPalette {
+        let base = NSColor(color).usingColorSpace(.sRGB) ?? .systemOrange
+        func mix(_ other: NSColor, _ f: CGFloat) -> Color { Color(nsColor: base.blended(withFraction: f, of: other) ?? base) }
+        return FlickPalette(top: mix(.white, 0.35), mid: Color(nsColor: base), bottom: mix(.black, 0.15), glow: mix(.white, 0.65))
+    }
+
+    static func named(_ name: String, accountColor: Color) -> FlickPalette {
+        switch name {
+        case "glacier": return .glacier
+        case "mint": return .mint
+        case "account": return .from(accountColor)
+        default: return .ember
+        }
+    }
+}
+
+private struct FlickPaletteKey: EnvironmentKey { static let defaultValue = FlickPalette.ember }
+private struct FlickCalmKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    var flickPalette: FlickPalette {
+        get { self[FlickPaletteKey.self] }
+        set { self[FlickPaletteKey.self] = newValue }
+    }
+    /// Keep Flick still (Settings › Flick › Calm mode).
+    var flickCalm: Bool {
+        get { self[FlickCalmKey.self] }
+        set { self[FlickCalmKey.self] = newValue }
+    }
+}
+
 /// Flick, the little ember. Drawn in a 120×110 space and animated from the clock,
 /// so every state loops smoothly. Respects Reduce Motion.
 struct FlickView: View {
@@ -32,14 +72,16 @@ struct FlickView: View {
     var size: CGFloat = 64
     var animated = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.flickPalette) private var palette
+    @Environment(\.flickCalm) private var calm
     /// Only animate while the hosting window is actually on screen (closed popovers and windows cost nothing).
     @State private var onScreen = false
 
     var body: some View {
-        let still = !animated || reduceMotion || !onScreen
+        let still = !animated || reduceMotion || calm || !onScreen
         let view = TimelineView(.animation(minimumInterval: 1.0 / mood.framesPerSecond, paused: still)) { timeline in
             Canvas { ctx, canvasSize in
-                FlickRenderer.draw(&ctx, size: canvasSize, mood: mood,
+                FlickRenderer.draw(&ctx, size: canvasSize, mood: mood, palette: palette,
                                    t: still ? 1.0 : timeline.date.timeIntervalSinceReferenceDate)
             }
         }
@@ -98,7 +140,7 @@ struct WindowVisibilityReader: NSViewRepresentable {
 enum FlickRenderer {
     static let ink = Color(hex: 0x3B1A10)
 
-    static func draw(_ ctx: inout GraphicsContext, size: CGSize, mood: FlickMood, t: Double) {
+    static func draw(_ ctx: inout GraphicsContext, size: CGSize, mood: FlickMood, palette: FlickPalette = .ember, t: Double) {
         ctx.scaleBy(x: size.width / 120, y: size.height / 110)
 
         // Motion parameters per mood.
@@ -149,13 +191,13 @@ enum FlickRenderer {
 
         let top = m(60, 12), bottom = m(60, 98)
         ctx.fill(body, with: .linearGradient(
-            Gradient(colors: [Color(hex: 0xF6A75E), Color(hex: 0xEB8048), Color(hex: 0xDA6A3E)]),
+            Gradient(colors: [palette.top, palette.mid, palette.bottom]),
             startPoint: top, endPoint: bottom))
 
         // Warm inner glow and a soft highlight.
         let glowCenter = m(60, 80)
         ctx.fill(Path(ellipseIn: CGRect(x: glowCenter.x - 20, y: glowCenter.y - 13, width: 40, height: 26)),
-                 with: .color(Color(hex: 0xFFC58F).opacity(0.35)))
+                 with: .color(palette.glow.opacity(0.35)))
         let shine = m(45, 64)
         ctx.fill(Path(ellipseIn: CGRect(x: shine.x - 4, y: shine.y - 8, width: 8, height: 16)),
                  with: .color(.white.opacity(0.3)))

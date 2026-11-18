@@ -28,6 +28,7 @@ struct MenuBarView: View {
         .padding(16)
         .frame(width: 348)
         .tint(Ember.accent)
+        .modifier(FlickThemed())
         .onAppear {
             appeared = false
             withAnimation(reduceMotion ? .none : .easeOut(duration: 0.9).delay(0.05)) { appeared = true }
@@ -40,7 +41,7 @@ struct MenuBarView: View {
     private var header: some View {
         let line = state.statusLine
         return HStack(spacing: 12) {
-            FlickView(mood: state.mood, size: 54)
+            FlickView(mood: state.mood, size: state.config.flick.popoverSize)
             VStack(alignment: .leading, spacing: 2) {
                 Text(line.title)
                     .font(.system(size: 15, weight: .semibold))
@@ -266,7 +267,14 @@ struct MenuBarView: View {
         let needs = live.filter { $0.mood == .needs }
         let working = live.filter { $0.mood == .working }
         return VStack(alignment: .leading, spacing: 6) {
-            Text("Activity").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 2)
+            HStack {
+                Text("Activity").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button("All sessions") { WindowManager.shared.show("sessions", state: state) }
+                    .buttonStyle(.borderless).font(.caption)
+                    .help(state.config.shortcuts["sessions"].map { "Shortcut: \($0.display)" } ?? "Show all sessions")
+            }
+            .padding(.horizontal, 2)
 
             ForEach(needs) { s in
                 HStack(spacing: 10) {

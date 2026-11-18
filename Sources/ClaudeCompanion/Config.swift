@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum Paths {
     static let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -93,6 +94,10 @@ struct CompanionConfig: Codable {
     var showMessagePreview: Bool
     /// Flick speaks in short friendly lines instead of plain status text.
     var friendlyMessages: Bool
+    var alerts = AlertSettings()
+    /// Action id → shortcut. A missing entry means the shortcut is off.
+    var shortcuts: [String: Shortcut] = Shortcut.defaults
+    var flick = FlickSettings()
 
     init(accounts: [Account], activeAccountID: String, paused: Bool, showMessagePreview: Bool, friendlyMessages: Bool) {
         self.accounts = accounts
@@ -111,6 +116,9 @@ struct CompanionConfig: Codable {
         paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
         showMessagePreview = try c.decodeIfPresent(Bool.self, forKey: .showMessagePreview) ?? true
         friendlyMessages = try c.decodeIfPresent(Bool.self, forKey: .friendlyMessages) ?? true
+        alerts = (try? c.decodeIfPresent(AlertSettings.self, forKey: .alerts)) ?? AlertSettings()
+        shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? Shortcut.defaults
+        flick = (try? c.decodeIfPresent(FlickSettings.self, forKey: .flick)) ?? FlickSettings()
     }
 
     static var defaults: CompanionConfig {
@@ -147,4 +155,81 @@ struct CompanionConfig: Codable {
     }
 
     func account(_ id: String) -> Account? { accounts.first { $0.id == id } }
+}
+
+// MARK: Alerts
+
+struct AlertSettings: Codable, Equatable {
+    /// Monthly budget alerts (80% and 100%), per account in USD. 0 = no budget.
+    var budgetEnabled = false
+    var budgets: [String: Double] = [:]
+    /// The current 5-hour window has used more than `windowThreshold` dollars.
+    var windowEnabled = false
+    var windowThreshold: Double = 30
+    /// A busy 5-hour window just reset.
+    var resetEnabled = true
+    /// A summary of the day at `summaryHour`.
+    var summaryEnabled = false
+    var summaryHour = 18
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AlertSettings()
+        budgetEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .budgetEnabled)) ?? d.budgetEnabled
+        budgets = (try? c.decodeIfPresent([String: Double].self, forKey: .budgets)) ?? d.budgets
+        windowEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .windowEnabled)) ?? d.windowEnabled
+        windowThreshold = (try? c.decodeIfPresent(Double.self, forKey: .windowThreshold)) ?? d.windowThreshold
+        resetEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .resetEnabled)) ?? d.resetEnabled
+        summaryEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .summaryEnabled)) ?? d.summaryEnabled
+        summaryHour = (try? c.decodeIfPresent(Int.self, forKey: .summaryHour)) ?? d.summaryHour
+    }
+}
+
+// MARK: Shortcuts
+
+/// A global keyboard shortcut, stored with Carbon key code and modifiers.
+struct Shortcut: Codable, Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+    var display: String
+
+    static let actions: [(id: String, title: String)] = [
+        ("account1", "Switch to account 1"), ("account2", "Switch to account 2"), ("account3", "Switch to account 3"),
+        ("popover", "Open Claude Companion"), ("sessions", "Show sessions"),
+    ]
+
+    // Carbon modifier bits: cmd 256, shift 512, option 2048, control 4096. Key codes: 1→18, 2→19, 3→20, C→8, S→1.
+    static let defaults: [String: Shortcut] = [
+        "account1": Shortcut(keyCode: 18, modifiers: 2048 | 256, display: "⌥⌘1"),
+        "account2": Shortcut(keyCode: 19, modifiers: 2048 | 256, display: "⌥⌘2"),
+        "account3": Shortcut(keyCode: 20, modifiers: 2048 | 256, display: "⌥⌘3"),
+        "popover": Shortcut(keyCode: 8, modifiers: 2048 | 256, display: "⌥⌘C"),
+        "sessions": Shortcut(keyCode: 1, modifiers: 2048 | 256, display: "⌥⌘S"),
+    ]
+}
+
+// MARK: Flick
+
+struct FlickSettings: Codable, Equatable {
+    /// "ember", "glacier", "mint" or "account" (the active account's color).
+    var color = "ember"
+    /// Size in the popover: "small", "medium", "large".
+    var size = "medium"
+    /// Keep Flick still even without macOS's Reduce Motion.
+    var calm = false
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        color = (try? c.decodeIfPresent(String.self, forKey: .color)) ?? "ember"
+        size = (try? c.decodeIfPresent(String.self, forKey: .size)) ?? "medium"
+        calm = (try? c.decodeIfPresent(Bool.self, forKey: .calm)) ?? false
+    }
+
+    var popoverSize: CGFloat {
+        switch size { case "small": return 42; case "large": return 68; default: return 54 }
+    }
 }

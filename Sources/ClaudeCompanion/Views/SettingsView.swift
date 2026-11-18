@@ -7,9 +7,12 @@ struct SettingsView: View {
             PersonalityTab().tabItem { Label("Flick", systemImage: "flame") }
             AccountsTab().tabItem { Label("Accounts", systemImage: "person.2") }
             SoundsTab().tabItem { Label("Notifications", systemImage: "bell.badge") }
+            AlertsTab().tabItem { Label("Alerts", systemImage: "exclamationmark.bubble") }
+            ShortcutsTab().tabItem { Label("Shortcuts", systemImage: "command") }
             SetupTab().tabItem { Label("Setup", systemImage: "wrench.and.screwdriver") }
         }
         .padding(16)
+        .modifier(FlickThemed())
     }
 }
 
@@ -335,12 +338,163 @@ private struct PersonalityTab: View {
                     }
                 }
                 .toggleStyle(.switch)
-                Text("Flick stays still when Reduce Motion is on in System Settings › Accessibility › Display.")
+                Divider()
+                HStack(spacing: 10) {
+                    Text("Color")
+                    ForEach([("ember", "Ember", FlickPalette.ember), ("glacier", "Glacier", .glacier), ("mint", "Mint", .mint),
+                             ("account", "Account", FlickPalette.from(state.config.color(for: state.activeAccount.id)))], id: \.0) { option in
+                        let selected = state.config.flick.color == option.0
+                        Button {
+                            withAnimation(.spring(response: 0.3)) { state.config.flick.color = option.0 }
+                        } label: {
+                            VStack(spacing: 3) {
+                                Circle()
+                                    .fill(LinearGradient(colors: [option.2.top, option.2.bottom], startPoint: .top, endPoint: .bottom))
+                                    .frame(width: 22, height: 22)
+                                    .overlay(Circle().stroke(Ember.accent, lineWidth: 2).padding(-3).opacity(selected ? 1 : 0))
+                                Text(option.1).font(.caption2).foregroundStyle(selected ? .primary : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(option.1)\(selected ? ", selected" : "")")
+                    }
+                }
+                Picker("Size in the menu", selection: $state.config.flick.size) {
+                    Text("Small").tag("small"); Text("Medium").tag("medium"); Text("Large").tag("large")
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 320)
+                Toggle("Calm mode (keep Flick still)", isOn: $state.config.flick.calm)
+                    .toggleStyle(.switch)
+                Text("Flick also stays still when Reduce Motion is on in System Settings › Accessibility › Display.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+// MARK: Alerts
+
+private struct AlertsTab: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Each alert can be turned on or off. Alerts fire once per period and stay quiet while notifications are paused.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                alert("Monthly budget", "Warns at 80% and 100% of each account's budget for the month.",
+                      isOn: $state.config.alerts.budgetEnabled) {
+                    ForEach(state.config.accounts) { account in
+                        HStack {
+                            Circle().fill(state.config.color(for: account.id)).frame(width: 8, height: 8)
+                            Text(account.name).frame(width: 90, alignment: .leading)
+                            TextField("No budget", value: budgetBinding(account.id), format: .currency(code: "USD"))
+                                .textFieldStyle(.roundedBorder).frame(width: 110)
+                            Text("per month").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                alert("Busy 5-hour window", "Tells you when the current window has used more than a set amount.",
+                      isOn: $state.config.alerts.windowEnabled) {
+                    HStack {
+                        Text("Alert above")
+                        TextField("", value: $state.config.alerts.windowThreshold, format: .currency(code: "USD"))
+                            .textFieldStyle(.roundedBorder).frame(width: 90)
+                        Text("in one window").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                alert("Window reset", "Tells you when a busy 5-hour window resets, so you know you can pick up again.",
+                      isOn: $state.config.alerts.resetEnabled) { EmptyView() }
+
+                alert("Daily summary", "Sessions, cost and your most active project, once a day.",
+                      isOn: $state.config.alerts.summaryEnabled) {
+                    Picker("Send at", selection: $state.config.alerts.summaryHour) {
+                        ForEach(0..<24, id: \.self) { h in
+                            Text(Calendar.current.date(bySettingHour: h, minute: 0, second: 0, of: Date())!
+                                    .formatted(date: .omitted, time: .shortened)).tag(h)
+                        }
+                    }
+                    .frame(width: 180)
+                }
+            }
+            .padding(4)
+        }
+    }
+
+    private func budgetBinding(_ id: String) -> Binding<Double?> {
+        Binding(get: { state.config.alerts.budgets[id] },
+                set: { state.config.alerts.budgets[id] = ($0 ?? 0) > 0 ? $0 : nil })
+    }
+
+    @ViewBuilder
+    private func alert<C: View>(_ title: String, _ detail: String, isOn: Binding<Bool>, @ViewBuilder options: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: isOn.animation(.easeInOut(duration: 0.2))) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            if isOn.wrappedValue {
+                options().padding(.leading, 4)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Ember.card))
+    }
+}
+
+// MARK: Shortcuts
+
+private struct ShortcutsTab: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Shortcuts work everywhere on your Mac. Click one and press the keys you want; the x turns it off.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                ForEach(Shortcut.actions, id: \.id) { action in
+                    GridRow {
+                        Text(title(for: action))
+                        ShortcutRecorder(shortcut: binding(action.id))
+                        if state.shortcutConflicts.contains(action.id) {
+                            Label("Used by another app", systemImage: "exclamationmark.triangle")
+                                .font(.caption).foregroundStyle(.orange)
+                        } else {
+                            Text("")
+                        }
+                    }
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Restore defaults") { state.config.shortcuts = Shortcut.defaults }
+            }
+            Spacer()
+        }
+        .padding(4)
+    }
+
+    private func title(for action: (id: String, title: String)) -> String {
+        if action.id.hasPrefix("account"), let i = Int(action.id.suffix(1)) {
+            return i <= state.config.accounts.count ? "Switch to \(state.config.accounts[i - 1].name)" : "Switch to account \(i)"
+        }
+        return action.title
+    }
+
+    private func binding(_ id: String) -> Binding<Shortcut?> {
+        Binding(get: { state.config.shortcuts[id] }, set: { state.config.shortcuts[id] = $0 })
     }
 }

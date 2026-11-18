@@ -50,6 +50,7 @@ enum Pricing {
 
 struct UsageEntry {
     let key: String          // message id + request id, for de-duplication
+    let session: String      // Claude Code session id
     let date: Date
     let model: String
     let project: String
@@ -87,9 +88,18 @@ struct AccountUsage {
     /// Claude Code's rolling 5-hour windows: a window opens (hour-floored) at the first
     /// message after the previous window closed.
     var currentBlock: UsageBlock? {
+        guard let block = lastBlock, block.isActive else { return nil }
+        return block
+    }
+
+    /// The most recent 5-hour window, active or not.
+    var lastBlock: UsageBlock? { lastBlock(now: Date()) }
+
+    /// The most recent 5-hour window as of `now` (entries after `now` are ignored).
+    func lastBlock(now: Date) -> UsageBlock? {
         var block: UsageBlock?
         let cal = Calendar.current
-        for e in entries {
+        for e in entries where e.date <= now {
             if block == nil || e.date >= block!.end {
                 let start = cal.dateInterval(of: .hour, for: e.date)?.start ?? e.date
                 block = UsageBlock(start: start, end: start.addingTimeInterval(5 * 3600), cost: 0, tokens: 0, output: 0)
@@ -98,7 +108,14 @@ struct AccountUsage {
             block!.tokens += e.totalTokens
             block!.output += e.output
         }
-        return block?.isActive == true ? block : nil
+        return block
+    }
+
+    /// Cost per Claude session id.
+    func costBySession(since d: Date = .distantPast) -> [String: Double] {
+        var acc: [String: Double] = [:]
+        for e in since(d) where !e.session.isEmpty { acc[e.session, default: 0] += e.cost }
+        return acc
     }
 
     func grouped(since d: Date, by key: (UsageEntry) -> String) -> [(name: String, cost: Double, tokens: Int)] {
@@ -230,7 +247,7 @@ final class UsageScanner {
         let id = msg["id"] as? String ?? UUID().uuidString
         let req = obj["requestId"] as? String ?? ""
         let cwd = obj["cwd"] as? String ?? url.deletingLastPathComponent().lastPathComponent
-        return UsageEntry(key: id + ":" + req, date: date, model: model,
+        return UsageEntry(key: id + ":" + req, session: obj["sessionId"] as? String ?? "", date: date, model: model,
                           project: (cwd as NSString).lastPathComponent,
                           input: input, output: output, cacheWrite: cacheWrite, cacheRead: cacheRead,
                           cost: cost)

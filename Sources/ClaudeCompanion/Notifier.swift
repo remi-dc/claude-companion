@@ -60,7 +60,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    func post(_ msg: HookMessage, account: Account?, preview: Bool) {
+    func post(_ msg: HookMessage, account: Account?, preview: Bool, palette: FlickPalette = .ember) {
         let accountName = account?.name ?? msg.accountID
         if let account { Sounds.play(account.sound(for: msg.event)) }
 
@@ -81,7 +81,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.interruptionLevel = msg.event == .permission ? .timeSensitive : .active
             content.userInfo = msg.location.userInfo
             let mood: FlickMood = msg.event == .permission ? .needs : .done
-            if let url = Self.flickImage(mood),
+            if let url = Self.flickImage(mood, palette: palette),
                let attachment = try? UNNotificationAttachment(identifier: "flick", url: url) {
                 content.attachments = [attachment]
             }
@@ -97,6 +97,29 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .list])
     }
 
+    /// Usage alerts and quick confirmations (not tied to a session). `sound: nil` stays silent.
+    func postAlert(title: String, body: String, mood: FlickMood, palette: FlickPalette, account: Account? = nil,
+                   sound: String? = "Tink") {
+        if let sound { Sounds.play(sound) }
+        permission { p in
+            guard p == .allowed else {
+                HookCLI.fallbackNotifySilent(title: title, body: body)
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            if let account { content.subtitle = account.name }
+            content.body = body
+            content.threadIdentifier = "alerts"
+            if let url = Self.flickImage(mood, palette: palette),
+               let attachment = try? UNNotificationAttachment(identifier: "flick", url: url) {
+                content.attachments = [attachment]
+            }
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
+    }
+
     /// Clicking a notification brings the app that hosts that session to the front.
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
@@ -108,9 +131,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// Renders Flick to a PNG for the notification. The system takes ownership of the file, so write a fresh copy each time.
-    static func flickImage(_ mood: FlickMood) -> URL? {
+    static func flickImage(_ mood: FlickMood, palette: FlickPalette = .ember) -> URL? {
         let png: Data? = MainActor.assumeIsolated {
-            let renderer = ImageRenderer(content: FlickView(mood: mood, size: 120, animated: false).padding(8))
+            let renderer = ImageRenderer(content: FlickView(mood: mood, size: 120, animated: false)
+                .environment(\.flickPalette, palette).padding(8))
             renderer.scale = 2
             guard let cg = renderer.cgImage else { return nil }
             return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])

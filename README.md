@@ -7,7 +7,11 @@ A small macOS menu bar app for people who use [Claude Code](https://docs.anthrop
 - **A menu bar popover** in a warm "Ember" style: account avatars, the 5-hour window as a ring, today's cost, a 7-day trend, and an activity feed with an **Open** button for sessions waiting on you. The menu bar icon shows when Claude is working or needs you.
 - **A different sound** for each account and event, so you can tell which account finished without looking. You can import your own sounds.
 - **Flick**, a little animated ember who shows what Claude is doing: he flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when it's quiet. His friendly messages can be turned off in Settings › Flick.
-- **Usage dashboard** for all accounts: the current 5-hour window, today, and the last 7 or 30 days. It includes a daily chart and breakdowns by model and project.
+- **Sessions window** (⌥⌘S): every running and recent session across accounts, with how long it has run, what it cost, and a button to jump back to it.
+- **Usage alerts** you can turn on or off one by one: monthly budget per account (80% and 100%), a busy 5-hour window, a window that just reset, and a daily summary.
+- **Global shortcuts** you can record yourself: switch accounts (⌥⌘1/2/3 by default), open the menu (⌥⌘C), show sessions (⌥⌘S).
+- **Make Flick yours:** Ember, Glacier, Mint or the active account's color; small, medium or large; and a calm mode that keeps him still.
+- **Usage dashboard** for all accounts: the current 5-hour window, today, and the last 7 or 30 days. It includes a daily chart and breakdowns by model and project. Export any view as CSV.
 
 > Unofficial community project. Not affiliated with or endorsed by Anthropic.
 

@@ -20,6 +20,9 @@ final class WindowManager {
         case "settings":
             (title, size, view) = ("Claude Companion Settings", NSSize(width: 720, height: 540),
                                    AnyView(SettingsView().environmentObject(state).environmentObject(state.updater).tint(Ember.accent)))
+        case "sessions":
+            (title, size, view) = ("Sessions", NSSize(width: 560, height: 520),
+                                   AnyView(SessionsView().environmentObject(state).tint(Ember.accent)))
         case "popover":
             // Same view as the menu bar popover, in a window (handy for screenshots and demos).
             (title, size, view) = ("Claude Companion", NSSize(width: 348, height: 640),

@@ -7,8 +7,11 @@ final class AppState: ObservableObject {
         didSet {
             config.save()
             Integration.writeActiveFile(activeAccount)
+            if config.shortcuts != oldValue.shortcuts { registerShortcuts() }
         }
     }
+    /// Shortcuts another app already uses (couldn't be registered).
+    @Published var shortcutConflicts: [String] = []
     @Published var usage: [String: AccountUsage] = [:]
     @Published var recent: [HookMessage] = []
     @Published var isScanning = false
@@ -59,6 +62,7 @@ final class AppState: ObservableObject {
         refreshUsage()
         refreshPermission()
         updater.start()
+        registerShortcuts()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshUsage(); self?.refreshPermission(); self?.now = Date() }
         }
@@ -85,6 +89,37 @@ final class AppState: ObservableObject {
 
     var liveSessions: [SessionStatus] {
         sessions.values.filter(isLive).sorted { $0.date > $1.date }
+    }
+
+    /// Flick's colors from Settings › Flick ("account" follows the active account).
+    var flickPalette: FlickPalette {
+        FlickPalette.named(config.flick.color, accountColor: config.color(for: activeAccount.id))
+    }
+
+    // MARK: Shortcuts
+
+    func registerShortcuts() {
+        shortcutConflicts = HotKeys.shared.register(config.shortcuts) { [weak self] action in
+            self?.performShortcut(action)
+        }
+    }
+
+    func performShortcut(_ action: String) {
+        switch action {
+        case "account1", "account2", "account3":
+            let index = Int(action.suffix(1))! - 1
+            guard index < config.accounts.count else { return }
+            let account = config.accounts[index]
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) { activate(account.id) }
+            notifier.postAlert(title: config.friendlyMessages ? "Switched to \(account.name)" : "Active account: \(account.name)",
+                               body: "New Claude sessions use this account.", mood: .done, palette: flickPalette, sound: nil)
+        case "popover":
+            HotKeys.togglePopover()
+        case "sessions":
+            WindowManager.shared.show("sessions", state: self)
+        default:
+            break
+        }
     }
 
     var mood: FlickMood {
@@ -158,8 +193,12 @@ final class AppState: ObservableObject {
         case .finished, .waiting: mood = .done
         }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+            // A session "starts" with its first prompt after being idle or done.
+            let previous = sessions[key]
+            let continuing = previous.map { $0.mood == .working || $0.mood == .needs } ?? false
+            let startedAt = continuing ? previous!.startedAt : msg.date
             sessions[key] = SessionStatus(id: key, accountID: msg.accountID, project: msg.project, mood: mood,
-                                          date: msg.date, appBundleID: msg.appBundleID ?? sessions[key]?.appBundleID,
+                                          date: msg.date, startedAt: startedAt, appBundleID: msg.appBundleID ?? sessions[key]?.appBundleID,
                                           location: SessionLocation(
                                             appBundleID: msg.appBundleID ?? sessions[key]?.location.appBundleID,
                                             cwd: msg.cwd ?? sessions[key]?.location.cwd,
@@ -177,7 +216,7 @@ final class AppState: ObservableObject {
         if recent.count > 30 { recent.removeLast(recent.count - 30) }
         let account = config.account(msg.accountID)
         guard !config.paused, account?.notificationsEnabled != false else { return }
-        notifier.post(msg, account: account, preview: config.showMessagePreview)
+        notifier.post(msg, account: account, preview: config.showMessagePreview, palette: flickPalette)
         // A finished turn usually means new usage on disk.
         if msg.event == .finished { refreshUsage() }
     }
@@ -205,6 +244,7 @@ final class AppState: ObservableObject {
             self.usage = result
             self.isScanning = false
             self.lastScan = Date()
+            AlertsEngine.evaluate(self)
         }
     }
 
@@ -269,6 +309,7 @@ struct SessionStatus: Identifiable, Hashable {
     var project: String
     var mood: FlickMood
     var date: Date
+    var startedAt: Date
     var appBundleID: String?
     var location: SessionLocation
 }

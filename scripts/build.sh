@@ -48,7 +48,7 @@ if [ "$ZIP" = 1 ]; then
 fi
 
 if [ "$INSTALL" = 1 ]; then
-  pkill -x ClaudeCompanion 2>/dev/null || true
+  pkill -x ClaudeCompanion 2>/dev/null && sleep 1 || true
   rm -rf "/Applications/Claude Companion.app"
   cp -R "$APP" /Applications/
   open "/Applications/Claude Companion.app"
