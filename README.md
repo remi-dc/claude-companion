@@ -3,7 +3,8 @@
 A small macOS menu bar app for people who use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with more than one account. It also helps if you just don't want to keep checking the terminal.
 
 - **Account switcher.** Pick Personal, Work or Backup (or add your own) from the menu bar. New `claude` sessions use that account.
-- **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message.
+- **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message. Clicking one brings the session's app (Terminal, VS Code…) to the front.
+- **A menu bar popover** in a warm "Ember" style: account avatars, the 5-hour window as a ring, today's cost, a 7-day trend, and an activity feed with an **Open** button for sessions waiting on you. The menu bar icon shows when Claude is working or needs you.
 - **A different sound** for each account and event, so you can tell which account finished without looking. You can import your own sounds.
 - **Flick**, a little animated ember who shows what Claude is doing: he flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when it's quiet. His friendly messages can be turned off in Settings › Flick.
 - **Usage dashboard** for all accounts: the current 5-hour window, today, and the last 7 or 30 days. It includes a daily chart and breakdowns by model and project.
@@ -24,7 +25,7 @@ cd claude-companion
 ./scripts/build.sh --install   # builds, copies to /Applications, launches
 ```
 
-`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it. The app is ad-hoc signed for local use. It has no Dock icon; look for it in the menu bar.
+`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it. It also generates the app icon from code, so there are no image assets to manage. The app is ad-hoc signed for local use. It has no Dock icon; look for it in the menu bar.
 
 ## Setup
 
@@ -63,6 +64,8 @@ The app binary has a few CLI subcommands:
 APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
 "$APP" usage              # per-account usage summary in the terminal
 "$APP" open dashboard     # show the dashboard (or: open settings)
+"$APP" open popover       # show the menu bar popover in a regular window (handy for screenshots)
+"$APP" render-icon <dir>  # write the app icon PNGs (used by build.sh)
 ```
 
 ## Limitations
@@ -78,7 +81,7 @@ APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
 2. Delete the `# Claude Companion` line from `~/.zshrc`
 3. Quit the app, then delete `/Applications/Claude Companion.app` and `~/.claude-companion`
 
-Your Claude Code config directories, logins and history are left as they are.
+Your Claude Code config directories, logins and history are left as they are. The `*.companion-backup` files next to your settings can be deleted once you're happy.
 
 ## Project layout
 
@@ -88,6 +91,10 @@ Sources/ClaudeCompanion/
   HookCLI.swift        hook handler (runs inside Claude Code's hook)
   Integration.swift    settings.json hooks, claude wrapper, login helper
   Notifier.swift       notifications and sounds
+  Flick.swift          the animated mascot
+  Theme.swift          Ember colors and shared styles
+  MenuBarIcon.swift    menu bar glyph and its states
+  AppIcon.swift        app icon, rendered at build time
   Usage.swift          transcript parser, pricing, aggregations
   AppState.swift       app state
   WindowManager.swift  dashboard and settings windows
