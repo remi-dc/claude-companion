@@ -23,7 +23,7 @@ struct HookMessage: Codable, Identifiable, Hashable {
     }
 }
 
-/// `ClaudeCompanion hook <stop|notification|prompt> --account <id>`
+/// `ClaudeCompanion hook <stop|notification|prompt|tool> --account <id>`
 /// Claude Code pipes the hook JSON on stdin. We must be quick and always exit 0.
 enum HookCLI {
     static func run(_ args: [String]) {
@@ -39,7 +39,9 @@ enum HookCLI {
         let event: HookEvent
         var body: String
 
-        if kind == "prompt" {
+        // "prompt": you sent a message. "tool": Claude finished an action, so it's working again
+        // (e.g. right after you approved a permission or answered a question).
+        if kind == "prompt" || kind == "tool" {
             event = .started
             body = ""
         } else if kind == "notification" {

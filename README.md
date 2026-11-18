@@ -44,7 +44,7 @@ cd claude-companion
 Open the menu bar icon → **Settings** → **Setup** and work through the steps:
 
 0. **Allow notifications.** macOS asks on first launch. If you missed the prompt, use **Open Notification Settings**. Until you allow them, you get plain AppleScript banners (shown as "Script Editor"). Sounds play either way.
-1. **Install hooks.** This adds `Stop`, `Notification` and `UserPromptSubmit` hooks to each account's `settings.json`. The hooks hand events to the app in the background, so Claude waits only a few milliseconds. If you installed hooks with an earlier version, the button reads **Update hooks**. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
+1. **Install hooks.** This adds `Stop`, `Notification`, `UserPromptSubmit` and `PostToolUse` hooks to each account's `settings.json`. The hooks hand events to the app in the background, so Claude waits only a few milliseconds. If you installed hooks with an earlier version, the button reads **Update hooks**. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
 2. **Install shell integration.** This installs a `claude` wrapper in `~/.claude-companion/bin` and adds one line to `~/.zshrc` to put it on your PATH. Open a new terminal tab afterwards.
 3. **VS Code** (optional). **Configure** sets the Claude Code extension's `claudeCode.claudeProcessWrapper` setting so the extension follows the active account too. It also works for Cursor, Windsurf and VS Code Insiders. Your editor settings keep their comments and formatting, and a backup is saved.
 4. **Log in to each account.** Go to Settings → Accounts → **Log in…** and type `/login` in the Terminal window that opens.

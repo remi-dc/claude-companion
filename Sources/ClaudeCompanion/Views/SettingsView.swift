@@ -212,7 +212,7 @@ private struct SetupTab: View {
                 }
 
                 step(1, "Notification hooks",
-                     "Adds hooks to each account's settings.json: Stop and Notification for alerts, UserPromptSubmit so Flick knows when Claude is working. They run in the background, so Claude never waits. A backup is saved next to the file, and existing settings and hooks are kept.") {
+                     "Adds hooks to each account's settings.json: Stop and Notification for alerts, UserPromptSubmit and PostToolUse so Flick knows when Claude is working (including right after you approve a permission). They run in the background, so Claude never waits. A backup is saved next to the file, and existing settings and hooks are kept.") {
                     HStack {
                         let n = state.config.accounts.filter(Integration.hooksUpToDate).count
                         let stale = state.config.accounts.contains { Integration.hooksInstalled(for: $0) && !Integration.hooksUpToDate(for: $0) }

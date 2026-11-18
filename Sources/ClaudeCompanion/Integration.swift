@@ -44,6 +44,7 @@ enum Integration {
         guard let data = FileManager.default.contents(atPath: account.settingsPath),
               let s = String(data: data, encoding: .utf8) else { return false }
         return s.contains(marker) && s.contains(" prompt --account \(account.id)")
+            && s.contains(" tool --account \(account.id)")
     }
 
     static func installHooks(for account: Account) throws {
@@ -56,6 +57,7 @@ enum Integration {
             }
             hooks["Stop", default: [Any]()].append(entry("stop"))
             hooks["UserPromptSubmit", default: [Any]()].append(entry("prompt"))
+            hooks["PostToolUse", default: [Any]()].append(entry("tool"))
             hooks["Notification", default: [Any]()].append(entry("notification", matcher: ""))
         }
     }
