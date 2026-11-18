@@ -230,8 +230,9 @@ enum Integration {
             launch = "'" + claude.replacingOccurrences(of: "'", with: "'\\''") + "'"
         } else {
             launch = """
-            echo "Claude Code wasn't found on this Mac."
-            echo "Install it (https://docs.anthropic.com/en/docs/claude-code), then click Log in… again."
+            echo "Claude Code wasn't found on this Mac (not in the usual places, your shell's PATH,"
+            echo "or the VS Code / Cursor extension). Install it from"
+            echo "https://docs.anthropic.com/en/docs/claude-code, then click Log in… again."
             """
         }
         let script = """
@@ -250,7 +251,7 @@ enum Integration {
 
     /// Finds the real Claude Code executable: common install locations first, then the PATH of the
     /// user's interactive shell (which loads ~/.zshrc). Our own `claude` wrapper is skipped.
-    static func findClaude(checkCommonLocations: Bool = true) -> String? {
+    static func findClaude(checkCommonLocations: Bool = true, checkShell: Bool = true) -> String? {
         let fm = FileManager.default
         let h = Paths.home
         var candidates = [h + "/.local/bin/claude", h + "/.claude/local/claude", "/opt/homebrew/bin/claude",
@@ -261,6 +262,30 @@ enum Integration {
         }
         if checkCommonLocations, let found = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) { return found }
 
+        if checkShell, let found = claudeOnShellPath() { return found }
+        // Last resort: the copy bundled with the Claude Code extension (people who only use it in their editor).
+        return bundledEditorClaude()
+    }
+
+    /// The newest `claude` shipped inside the Claude Code extension of VS Code, Insiders, Cursor or Windsurf.
+    static func bundledEditorClaude() -> String? {
+        let fm = FileManager.default
+        var found: [(version: [Int], path: String)] = []
+        for editor in [".vscode", ".vscode-insiders", ".cursor", ".windsurf"] {
+            let dir = Paths.home + "/\(editor)/extensions"
+            for name in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where name.hasPrefix("anthropic.claude-code-") {
+                let path = "\(dir)/\(name)/resources/native-binary/claude"
+                guard fm.isExecutableFile(atPath: path) else { continue }
+                let version = name.dropFirst("anthropic.claude-code-".count).split(separator: "-").first?
+                    .split(separator: ".").map { Int($0) ?? 0 } ?? []
+                found.append((version, path))
+            }
+        }
+        return found.max { $0.version.lexicographicallyPrecedes($1.version) }?.path
+    }
+
+    private static func claudeOnShellPath() -> String? {
+        let fm = FileManager.default
         // Ask the user's shell for its PATH, with their startup files loaded.
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let p = Process()
