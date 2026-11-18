@@ -63,6 +63,11 @@ private struct AccountEditor: View {
                 }
                 TextField("Config directory", text: binding(\.configDir)).textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
+                Picker("Sign in with", selection: binding(\.loginBrowser)) {
+                    Text("Default browser").tag(String?.none)
+                    ForEach(LoginBrowser.available()) { b in Text(b.label).tag(Optional(b.id)) }
+                }
+                .help("Claude's sign-in page (Log in… or /login) opens here, so this account uses the right browser profile.")
                 HStack(spacing: 14) {
                     Label(account.loggedInEmail ?? "Not logged in",
                           systemImage: account.loggedInEmail == nil ? "xmark.circle" : "checkmark.seal")

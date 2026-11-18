@@ -52,6 +52,8 @@ struct Account: Codable, Identifiable, Hashable {
     var configDir: String
     var sounds: [String: String]
     var notificationsEnabled: Bool
+    /// Browser (and profile) Claude's sign-in page opens in for this account; nil = system default.
+    var loginBrowser: String? = nil
 
     var expandedConfigDir: String {
         var p = (configDir as NSString).expandingTildeInPath

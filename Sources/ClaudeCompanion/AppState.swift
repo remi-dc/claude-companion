@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
         config.save()
         Integration.writeActiveFile(activeAccount)
         Integration.writeHookShim()
+        Integration.refreshInstalledWrappers()
         notifier.requestAuthorization()
 
         DistributedNotificationCenter.default().addObserver(

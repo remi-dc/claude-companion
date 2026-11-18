@@ -102,6 +102,26 @@ enum Integration {
     static func writeActiveFile(_ account: Account) {
         Paths.ensureDir(Paths.companionDir)
         try? account.expandedConfigDir.write(toFile: Paths.activeFile, atomically: true, encoding: .utf8)
+        // The wrappers read this to set $BROWSER, so /login opens the right browser profile.
+        try? (browserScript(for: account) ?? "").write(toFile: activeBrowserFile, atomically: true, encoding: .utf8)
+    }
+
+    static let activeBrowserFile = Paths.companionDir + "/active-browser"
+
+    /// Writes the account's $BROWSER script and returns its path (nil = system default browser).
+    @discardableResult
+    static func browserScript(for account: Account) -> String? {
+        guard let browser = LoginBrowser.find(account.loginBrowser) else { return nil }
+        Paths.ensureDir(Paths.binDir)
+        let path = Paths.binDir + "/browser-\(account.id)"
+        writeExecutable(browser.script, to: path)
+        return path
+    }
+
+    /// Rewrites installed wrappers so they pick up improvements from newer versions.
+    static func refreshInstalledWrappers() {
+        if wrapperInstalled { installWrapper() }
+        if FileManager.default.fileExists(atPath: vscodeWrapper) { installVSCodeWrapper() }
     }
 
     static let zshrcLine = "export PATH=\"$HOME/.claude-companion/bin:$PATH\"  # Claude Companion"
@@ -133,6 +153,9 @@ enum Integration {
           DIR=""
           [ -f "$HOME/.claude-companion/active-config-dir" ] && DIR=$(cat "$HOME/.claude-companion/active-config-dir")
           if [ -n "$DIR" ] && [ "$DIR" != "$HOME/.claude" ]; then export CLAUDE_CONFIG_DIR="$DIR"; fi
+          B=""
+          [ -f "$HOME/.claude-companion/active-browser" ] && B=$(cat "$HOME/.claude-companion/active-browser")
+          if [ -z "$BROWSER" ] && [ -n "$B" ] && [ -x "$B" ]; then export BROWSER="$B"; fi
         fi
         exec "$REAL" "$@"
         """#
@@ -170,6 +193,9 @@ enum Integration {
           DIR=""
           [ -f "$HOME/.claude-companion/active-config-dir" ] && DIR=$(cat "$HOME/.claude-companion/active-config-dir")
           if [ -n "$DIR" ] && [ "$DIR" != "$HOME/.claude" ]; then export CLAUDE_CONFIG_DIR="$DIR"; fi
+          B=""
+          [ -f "$HOME/.claude-companion/active-browser" ] && B=$(cat "$HOME/.claude-companion/active-browser")
+          if [ -z "$BROWSER" ] && [ -n "$B" ] && [ -x "$B" ]; then export BROWSER="$B"; fi
         fi
         exec "$@"
         """#
@@ -222,7 +248,10 @@ enum Integration {
     static func openLoginTerminal(for account: Account) {
         Paths.ensureDir(account.expandedConfigDir)
         let quoted = "'" + account.expandedConfigDir.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        let env = account.isDefaultDir ? "unset CLAUDE_CONFIG_DIR" : "export CLAUDE_CONFIG_DIR=\(quoted)"
+        var env = account.isDefaultDir ? "unset CLAUDE_CONFIG_DIR" : "export CLAUDE_CONFIG_DIR=\(quoted)"
+        if let browser = browserScript(for: account) {
+            env += "\nexport BROWSER='" + browser.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
         // A .command file doesn't load ~/.zshrc, where many people put Claude Code on their PATH
         // (npm, nvm, conda…), so use the full path we found.
         let launch: String
