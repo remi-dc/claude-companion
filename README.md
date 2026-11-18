@@ -11,21 +11,31 @@ A small macOS menu bar app for people who use [Claude Code](https://docs.anthrop
 
 > Unofficial community project. Not affiliated with or endorsed by Anthropic.
 
-## Requirements
-
-- macOS 14 (Sonoma) or later
-- Xcode or the Command Line Tools (`xcode-select --install`), with Swift 5.9 or later
-- Claude Code installed (`claude` on your PATH)
-
 ## Install
 
+Paste this in Terminal:
+
 ```sh
-git clone <this repo>
+curl -fsSL https://raw.githubusercontent.com/remi-dc/claude-companion/main/install.sh | sh
+```
+
+It downloads the latest release (a universal app for Apple Silicon and Intel), installs it in `/Applications` and launches it. Then click the chat-bubble icon in the menu bar and **Install** in the orange banner. That's it.
+
+You need macOS 14 (Sonoma) or later and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You can [read the script](install.sh) before running it. To update, run the same command again.
+
+> **Why a Terminal command and not a download link?** The app isn't notarized by Apple (that needs a paid developer account), so macOS blocks it when it's downloaded in a browser. Downloads made with `curl` don't get that block.
+
+### Build from source
+
+Needs the Xcode Command Line Tools (`xcode-select --install`):
+
+```sh
+git clone https://github.com/remi-dc/claude-companion.git
 cd claude-companion
 ./scripts/build.sh --install   # builds, copies to /Applications, launches
 ```
 
-`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it. It also generates the app icon from code, so there are no image assets to manage. The app is ad-hoc signed for local use. It has no Dock icon; look for it in the menu bar.
+`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it; `--universal --zip` makes a release zip. The app icon is generated from code, so there are no image assets to manage. The app has no Dock icon; look for it in the menu bar.
 
 ## Setup
 
