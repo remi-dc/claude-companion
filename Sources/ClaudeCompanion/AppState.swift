@@ -134,9 +134,7 @@ final class AppState: ObservableObject {
 
     /// Brings the app hosting a session (Terminal, VS Code…) to the front.
     func open(_ session: SessionStatus) {
-        guard let id = session.appBundleID,
-              let app = NSRunningApplication.runningApplications(withBundleIdentifier: id).first else { return }
-        app.activate()
+        Navigator.go(to: session.location)
     }
 
     var activeAccount: Account {
@@ -158,7 +156,12 @@ final class AppState: ObservableObject {
         }
         withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
             sessions[key] = SessionStatus(id: key, accountID: msg.accountID, project: msg.project, mood: mood,
-                                          date: msg.date, appBundleID: msg.appBundleID ?? sessions[key]?.appBundleID)
+                                          date: msg.date, appBundleID: msg.appBundleID ?? sessions[key]?.appBundleID,
+                                          location: SessionLocation(
+                                            appBundleID: msg.appBundleID ?? sessions[key]?.location.appBundleID,
+                                            cwd: msg.cwd ?? sessions[key]?.location.cwd,
+                                            tty: msg.tty ?? sessions[key]?.location.tty,
+                                            sessionID: msg.sessionID))
         }
         if sessions.count > 50 {
             for k in sessions.sorted(by: { $0.value.date < $1.value.date }).prefix(sessions.count - 50).map(\.key) {
@@ -264,4 +267,5 @@ struct SessionStatus: Identifiable, Hashable {
     var mood: FlickMood
     var date: Date
     var appBundleID: String?
+    var location: SessionLocation
 }

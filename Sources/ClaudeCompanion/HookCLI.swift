@@ -15,6 +15,12 @@ struct HookMessage: Codable, Identifiable, Hashable {
     var sessionID: String?
     /// The app hosting the session (Terminal, VS Code…), so we can bring it to the front.
     var appBundleID: String?
+    var cwd: String?
+    var tty: String?
+
+    var location: SessionLocation {
+        SessionLocation(appBundleID: appBundleID, cwd: cwd, tty: tty, sessionID: sessionID)
+    }
 }
 
 /// `ClaudeCompanion hook <stop|notification|prompt> --account <id>`
@@ -53,7 +59,14 @@ enum HookCLI {
 
         let msg = HookMessage(accountID: accountID, event: event, project: project,
                               body: body, sessionID: json["session_id"] as? String,
-                              appBundleID: hostAppBundleID())
+                              appBundleID: hostAppBundleID(), cwd: cwd, tty: controllingTTY())
+
+        // CLAUDE_COMPANION_DEBUG=1: print what would be sent, for troubleshooting.
+        if ProcessInfo.processInfo.environment["CLAUDE_COMPANION_DEBUG"] != nil,
+           let data = try? JSONEncoder().encode(msg) {
+            print(String(decoding: data, as: UTF8.self))
+            return
+        }
 
         if !NSRunningApplication.runningApplications(withBundleIdentifier: kBundleID).isEmpty,
            let data = try? JSONEncoder().encode(msg), let str = String(data: data, encoding: .utf8) {
@@ -67,8 +80,40 @@ enum HookCLI {
     }
 
     /// Walks up the process tree to the first regular app (Terminal, iTerm, VS Code, Cursor…).
+    /// The process that ran the hook. The shim passes it along, because by the time this
+    /// background process looks, the shim itself may already have exited.
+    static var hookParentPID: pid_t {
+        if let s = ProcessInfo.processInfo.environment["CLAUDE_COMPANION_PPID"], let p = pid_t(s), p > 1 { return p }
+        return getppid()
+    }
+
+    static func processInfo(_ pid: pid_t) -> kinfo_proc? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        return info
+    }
+
+    /// The terminal device of the Claude session (e.g. /dev/ttys003), to find its exact tab.
+    static func controllingTTY() -> String? {
+        var pid = hookParentPID
+        for _ in 0..<30 {
+            guard let info = processInfo(pid) else { return nil }
+            let dev = info.kp_eproc.e_tdev
+            if dev != -1, let name = devname(dev, S_IFCHR) {
+                let s = String(cString: name)
+                if s != "??" { return "/dev/" + s }
+            }
+            let parent = info.kp_eproc.e_ppid
+            if parent <= 1 { return nil }
+            pid = parent
+        }
+        return nil
+    }
+
     static func hostAppBundleID() -> String? {
-        var pid = getppid()
+        var pid = hookParentPID
         for _ in 0..<30 {
             if let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy == .regular,
                let id = app.bundleIdentifier, id != kBundleID {

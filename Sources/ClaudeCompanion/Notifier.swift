@@ -79,7 +79,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.body = body
             content.threadIdentifier = msg.accountID
             content.interruptionLevel = msg.event == .permission ? .timeSensitive : .active
-            if let app = msg.appBundleID { content.userInfo = ["app": app] }
+            content.userInfo = msg.location.userInfo
             let mood: FlickMood = msg.event == .permission ? .needs : .done
             if let url = Self.flickImage(mood),
                let attachment = try? UNNotificationAttachment(identifier: "flick", url: url) {
@@ -100,10 +100,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// Clicking a notification brings the app that hosts that session to the front.
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let id = response.notification.request.content.userInfo["app"] as? String {
-            DispatchQueue.main.async {
-                NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.activate()
-            }
+        let location = SessionLocation(userInfo: response.notification.request.content.userInfo)
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { Navigator.go(to: location) }
         }
         completionHandler()
     }
