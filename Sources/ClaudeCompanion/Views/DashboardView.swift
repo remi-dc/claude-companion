@@ -79,6 +79,7 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                greeting
                 controls
                 tiles
                 if case .all = scope { accountCards }
@@ -92,9 +93,21 @@ struct DashboardView: View {
                 Text("Costs are estimates at Anthropic API list prices, computed from local Claude Code transcripts (last \(UsageScanner.lookbackDays) days). Subscription plans aren't billed per token — use this to compare accounts and spot heavy sessions.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            .padding(20)
+            .padding(24)
         }
+        .background(Ember.window)
         .onAppear { state.refreshUsage() }
+    }
+
+    private var greeting: some View {
+        let line = state.statusLine
+        return HStack(spacing: 14) {
+            FlickView(mood: state.mood, size: 64)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Usage").font(.system(size: 28, weight: .bold))
+                Text("\(line.title) · \(line.subtitle)").font(.callout).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var controls: some View {
@@ -168,7 +181,7 @@ struct DashboardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Ember.card))
             }
         }
     }
@@ -181,9 +194,15 @@ struct DashboardView: View {
             Text(scopeIsAll ? "Stacked by account" : "Stacked by model family")
                 .font(.caption).foregroundStyle(.secondary)
             if pts.isEmpty {
-                ContentUnavailableView("No usage yet", systemImage: "chart.bar",
-                                       description: Text("Nothing in the last \(days) days for this scope."))
-                    .frame(height: 240)
+                VStack(spacing: 8) {
+                    FlickView(mood: .sleep, size: 96)
+                    Text("No usage yet").font(.headline)
+                    Text(state.config.friendlyMessages ? "Nothing in the last \(days) days. I'm taking a nap."
+                                                       : "Nothing in the last \(days) days for this scope.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
             } else {
                 Chart {
                     ForEach(pts) { p in
@@ -218,7 +237,7 @@ struct DashboardView: View {
             }
         }
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.03)))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ember.cardRaised))
     }
 
     private var scopeIsAll: Bool { if case .all = scope { return true } else { return false } }
@@ -256,12 +275,12 @@ struct StatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 26, weight: .semibold).monospacedDigit())
+            Text(value).font(.number(28)).contentTransition(.numericText())
             Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ember.card))
     }
 }
 
@@ -287,6 +306,6 @@ private struct BreakdownTable: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.03)))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ember.cardRaised))
     }
 }

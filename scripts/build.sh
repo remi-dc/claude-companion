@@ -11,6 +11,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ClaudeCompanion"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+rm -rf build/AppIcon.iconset
+"$BIN" render-icon build/AppIcon.iconset
+iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+xattr -cr "$APP"
 codesign --force --deep --sign - "$APP"
 echo "Built $APP"
 

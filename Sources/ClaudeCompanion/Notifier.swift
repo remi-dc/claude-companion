@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import UserNotifications
 
 enum Sounds {
@@ -78,6 +79,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.body = body
             content.threadIdentifier = msg.accountID
             content.interruptionLevel = msg.event == .permission ? .timeSensitive : .active
+            if let app = msg.appBundleID { content.userInfo = ["app": app] }
+            let mood: FlickMood = msg.event == .permission ? .needs : .done
+            if let url = Self.flickImage(mood),
+               let attachment = try? UNNotificationAttachment(identifier: "flick", url: url) {
+                content.attachments = [attachment]
+            }
             let req = UNNotificationRequest(identifier: msg.id.uuidString, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(req) { error in
                 if let error { NSLog("Claude Companion: failed to post notification: %@", String(describing: error)) }
@@ -88,6 +95,32 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .list])
+    }
+
+    /// Clicking a notification brings the app that hosts that session to the front.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        if let id = response.notification.request.content.userInfo["app"] as? String {
+            DispatchQueue.main.async {
+                NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.activate()
+            }
+        }
+        completionHandler()
+    }
+
+    /// Renders Flick to a PNG for the notification. The system takes ownership of the file, so write a fresh copy each time.
+    static func flickImage(_ mood: FlickMood) -> URL? {
+        let png: Data? = MainActor.assumeIsolated {
+            let renderer = ImageRenderer(content: FlickView(mood: mood, size: 120, animated: false).padding(8))
+            renderer.scale = 2
+            guard let cg = renderer.cgImage else { return nil }
+            return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        }
+        guard let png else { return nil }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeCompanion", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("flick-\(mood.rawValue)-\(UUID().uuidString).png")
+        return (try? png.write(to: url)) != nil ? url : nil
     }
 
     static func openSystemSettings() {

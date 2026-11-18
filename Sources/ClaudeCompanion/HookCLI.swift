@@ -13,9 +13,11 @@ struct HookMessage: Codable, Identifiable, Hashable {
     var project: String
     var body: String
     var sessionID: String?
+    /// The app hosting the session (Terminal, VS Code…), so we can bring it to the front.
+    var appBundleID: String?
 }
 
-/// `ClaudeCompanion hook <stop|notification> --account <id>`
+/// `ClaudeCompanion hook <stop|notification|prompt> --account <id>`
 /// Claude Code pipes the hook JSON on stdin. We must be quick and always exit 0.
 enum HookCLI {
     static func run(_ args: [String]) {
@@ -31,7 +33,10 @@ enum HookCLI {
         let event: HookEvent
         var body: String
 
-        if kind == "notification" {
+        if kind == "prompt" {
+            event = .started
+            body = ""
+        } else if kind == "notification" {
             let message = json["message"] as? String ?? "Claude needs your attention"
             let type = json["notification_type"] as? String ?? ""
             if type == "permission_prompt" || message.localizedCaseInsensitiveContains("permission") {
@@ -47,7 +52,8 @@ enum HookCLI {
         if body.count > 180 { body = String(body.prefix(177)) + "…" }
 
         let msg = HookMessage(accountID: accountID, event: event, project: project,
-                              body: body, sessionID: json["session_id"] as? String)
+                              body: body, sessionID: json["session_id"] as? String,
+                              appBundleID: hostAppBundleID())
 
         if !NSRunningApplication.runningApplications(withBundleIdentifier: kBundleID).isEmpty,
            let data = try? JSONEncoder().encode(msg), let str = String(data: data, encoding: .utf8) {
@@ -60,8 +66,28 @@ enum HookCLI {
         }
     }
 
+    /// Walks up the process tree to the first regular app (Terminal, iTerm, VS Code, Cursor…).
+    static func hostAppBundleID() -> String? {
+        var pid = getppid()
+        for _ in 0..<30 {
+            if let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy == .regular,
+               let id = app.bundleIdentifier, id != kBundleID {
+                return id
+            }
+            var info = kinfo_proc()
+            var size = MemoryLayout<kinfo_proc>.stride
+            var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+            guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+            let parent = info.kp_eproc.e_ppid
+            if parent <= 1 { return nil }
+            pid = parent
+        }
+        return nil
+    }
+
     /// App not running: still show something via AppleScript, with the configured sound.
     static func fallbackNotify(_ msg: HookMessage) {
+        if msg.event == .started { return }
         let cfg = CompanionConfig.load()
         if cfg.paused { return }
         let account = cfg.account(msg.accountID)

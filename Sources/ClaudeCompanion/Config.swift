@@ -19,13 +19,19 @@ enum Paths {
 /// The three moments Claude Code can tell us about.
 enum HookEvent: String, Codable, CaseIterable, Identifiable {
     case finished, permission, waiting
+    /// You sent a prompt; Claude is working. Drives Flick, never notifies.
+    case started
     var id: String { rawValue }
+
+    /// The events that produce a notification and have a sound.
+    static let notifiable: [HookEvent] = [.finished, .permission, .waiting]
 
     var title: String {
         switch self {
         case .finished: return "Finished"
         case .permission: return "Needs permission"
         case .waiting: return "Waiting for input"
+        case .started: return "Working"
         }
     }
 
@@ -34,6 +40,7 @@ enum HookEvent: String, Codable, CaseIterable, Identifiable {
         case .finished: return "checkmark.circle.fill"
         case .permission: return "hand.raised.fill"
         case .waiting: return "ellipsis.bubble.fill"
+        case .started: return "flame.fill"
         }
     }
 }
@@ -82,6 +89,27 @@ struct CompanionConfig: Codable {
     var activeAccountID: String
     var paused: Bool
     var showMessagePreview: Bool
+    /// Flick speaks in short friendly lines instead of plain status text.
+    var friendlyMessages: Bool
+
+    init(accounts: [Account], activeAccountID: String, paused: Bool, showMessagePreview: Bool, friendlyMessages: Bool) {
+        self.accounts = accounts
+        self.activeAccountID = activeAccountID
+        self.paused = paused
+        self.showMessagePreview = showMessagePreview
+        self.friendlyMessages = friendlyMessages
+    }
+
+    /// Tolerant decoding: settings added in later versions fall back to defaults.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = CompanionConfig.defaults
+        accounts = try c.decodeIfPresent([Account].self, forKey: .accounts) ?? d.accounts
+        activeAccountID = try c.decodeIfPresent(String.self, forKey: .activeAccountID) ?? d.activeAccountID
+        paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
+        showMessagePreview = try c.decodeIfPresent(Bool.self, forKey: .showMessagePreview) ?? true
+        friendlyMessages = try c.decodeIfPresent(Bool.self, forKey: .friendlyMessages) ?? true
+    }
 
     static var defaults: CompanionConfig {
         CompanionConfig(
@@ -95,7 +123,8 @@ struct CompanionConfig: Codable {
             ],
             activeAccountID: "personal",
             paused: false,
-            showMessagePreview: true
+            showMessagePreview: true,
+            friendlyMessages: true
         )
     }
 

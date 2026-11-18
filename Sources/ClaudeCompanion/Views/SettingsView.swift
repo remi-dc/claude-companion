@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     var body: some View {
         TabView {
+            PersonalityTab().tabItem { Label("Flick", systemImage: "flame") }
             AccountsTab().tabItem { Label("Accounts", systemImage: "person.2") }
             SoundsTab().tabItem { Label("Notifications", systemImage: "bell.badge") }
             SetupTab().tabItem { Label("Setup", systemImage: "wrench.and.screwdriver") }
@@ -66,9 +67,10 @@ private struct AccountEditor: View {
                     Label(account.loggedInEmail ?? "Not logged in",
                           systemImage: account.loggedInEmail == nil ? "xmark.circle" : "checkmark.seal")
                         .foregroundStyle(account.loggedInEmail == nil ? .orange : .secondary)
-                    Label(Integration.hooksInstalled(for: account) ? "Hooks installed" : "Hooks missing",
-                          systemImage: Integration.hooksInstalled(for: account) ? "bolt.fill" : "bolt.slash")
-                        .foregroundStyle(Integration.hooksInstalled(for: account) ? Color.secondary : Color.orange)
+                    let upToDate = Integration.hooksUpToDate(for: account)
+                    Label(upToDate ? "Hooks installed" : Integration.hooksInstalled(for: account) ? "Hooks need update" : "Hooks missing",
+                          systemImage: upToDate ? "bolt.fill" : "bolt.slash")
+                        .foregroundStyle(upToDate ? Color.secondary : Color.orange)
                     Spacer()
                     Button("Log in…") { Integration.openLoginTerminal(for: account) }
                         .help("Opens Terminal running Claude Code for this account — type /login")
@@ -99,7 +101,7 @@ private struct SoundsTab: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
                 GridRow {
                     Text("Account").font(.caption).foregroundStyle(.secondary)
-                    ForEach(HookEvent.allCases) { e in
+                    ForEach(HookEvent.notifiable) { e in
                         Label(e.title, systemImage: e.symbol).font(.caption).foregroundStyle(.secondary)
                     }
                     Text("On").font(.caption).foregroundStyle(.secondary)
@@ -108,7 +110,7 @@ private struct SoundsTab: View {
                 ForEach(state.config.accounts) { account in
                     GridRow {
                         Label(account.name, systemImage: account.symbol)
-                        ForEach(HookEvent.allCases) { e in
+                        ForEach(HookEvent.notifiable) { e in
                             HStack(spacing: 4) {
                                 Picker("", selection: soundBinding(account, e)) {
                                     ForEach(sounds, id: \.self) { Text($0).tag($0) }
@@ -188,12 +190,13 @@ private struct SetupTab: View {
                 }
 
                 step(1, "Notification hooks",
-                     "Adds Stop and Notification hooks to each account's settings.json (a backup is saved next to it). Existing settings and hooks are kept.") {
+                     "Adds hooks to each account's settings.json: Stop and Notification for alerts, UserPromptSubmit so Flick knows when Claude is working. They run in the background, so Claude never waits. A backup is saved next to the file, and existing settings and hooks are kept.") {
                     HStack {
-                        Button("Install hooks") { state.installAllHooks() }.buttonStyle(.borderedProminent)
+                        let n = state.config.accounts.filter(Integration.hooksUpToDate).count
+                        let stale = state.config.accounts.contains { Integration.hooksInstalled(for: $0) && !Integration.hooksUpToDate(for: $0) }
+                        Button(stale ? "Update hooks" : "Install hooks") { state.installAllHooks() }.buttonStyle(.borderedProminent)
                         Button("Remove hooks") { state.removeAllHooks() }
                         Spacer()
-                        let n = state.config.accounts.filter(Integration.hooksInstalled).count
                         Text("\(n)/\(state.config.accounts.count) accounts").font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -237,7 +240,7 @@ private struct SetupTab: View {
 
                 step(5, "Test it", "Sends a sample of each notification for the active account.") {
                     HStack {
-                        ForEach(HookEvent.allCases) { e in
+                        ForEach(HookEvent.notifiable) { e in
                             Button { state.sendTest(e, account: state.activeAccount) } label: {
                                 Label(e.title, systemImage: e.symbol)
                             }
@@ -268,5 +271,49 @@ private struct SetupTab: View {
                 content()
             }
         }
+    }
+}
+
+// MARK: Flick
+
+private struct PersonalityTab: View {
+    @EnvironmentObject var state: AppState
+    @State private var preview: FlickMood = .idle
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 28) {
+            VStack(spacing: 14) {
+                FlickView(mood: preview, size: 150)
+                    .padding(18)
+                    .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Ember.card))
+                Picker("Preview", selection: $preview) {
+                    ForEach(FlickMood.allCases, id: \.self) { Text($0.label.capitalized).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 160)
+            }
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Meet Flick").font(.title2.weight(.semibold))
+                Text("Flick is the little ember who keeps an eye on Claude for you. He flickers while Claude works, hops when a session needs your OK, and takes a nap when things are quiet.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(isOn: $state.config.friendlyMessages) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Friendly messages")
+                        Text(state.config.friendlyMessages
+                             ? "Flick talks to you: “On it! Working on billing-api”."
+                             : "Plain status text: “Working · billing-api”.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                Text("Flick stays still when Reduce Motion is on in System Settings › Accessibility › Display.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }

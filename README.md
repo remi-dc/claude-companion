@@ -5,6 +5,7 @@ A small macOS menu bar app for people who use [Claude Code](https://docs.anthrop
 - **Account switcher.** Pick Personal, Work or Backup (or add your own) from the menu bar. New `claude` sessions use that account.
 - **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message.
 - **A different sound** for each account and event, so you can tell which account finished without looking. You can import your own sounds.
+- **Flick**, a little animated ember who shows what Claude is doing: he flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when it's quiet. His friendly messages can be turned off in Settings › Flick.
 - **Usage dashboard** for all accounts: the current 5-hour window, today, and the last 7 or 30 days. It includes a daily chart and breakdowns by model and project.
 
 > Unofficial community project. Not affiliated with or endorsed by Anthropic.
@@ -30,7 +31,7 @@ cd claude-companion
 Open the menu bar icon → **Settings** → **Setup** and work through the steps:
 
 0. **Allow notifications.** macOS asks on first launch. If you missed the prompt, use **Open Notification Settings**. Until you allow them, you get plain AppleScript banners (shown as "Script Editor"). Sounds play either way.
-1. **Install hooks.** This adds `Stop` and `Notification` hooks to each account's `settings.json`. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
+1. **Install hooks.** This adds `Stop`, `Notification` and `UserPromptSubmit` hooks to each account's `settings.json`. The hooks hand events to the app in the background, so Claude waits only a few milliseconds. If you installed hooks with an earlier version, the button reads **Update hooks**. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
 2. **Install shell integration.** This installs a `claude` wrapper in `~/.claude-companion/bin` and adds one line to `~/.zshrc` to put it on your PATH. Open a new terminal tab afterwards.
 3. **VS Code** (optional). **Configure** sets the Claude Code extension's `claudeCode.claudeProcessWrapper` setting so the extension follows the active account too. It also works for Cursor, Windsurf and VS Code Insiders. Your editor settings keep their comments and formatting, and a backup is saved.
 4. **Log in to each account.** Go to Settings → Accounts → **Log in…** and type `/login` in the Terminal window that opens.

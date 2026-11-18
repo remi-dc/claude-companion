@@ -16,6 +16,10 @@ enum Entry {
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
             exit(0)
         }
+        if args.count > 2 && args[1] == "render-icon" {
+            MainActor.assumeIsolated { AppIconView.renderIconset(to: args[2]) }
+            exit(0)
+        }
         if args.count > 1 && args[1] == "usage" {
             printUsage()
             exit(0)

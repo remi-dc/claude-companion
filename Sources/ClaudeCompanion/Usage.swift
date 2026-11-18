@@ -220,6 +220,7 @@ enum Fmt {
     }
     static func remaining(until d: Date) -> String {
         let s = max(0, Int(d.timeIntervalSinceNow))
+        if s < 3600 { return "\((s % 3600) / 60)m" }
         return "\(s / 3600)h \(String(format: "%02d", (s % 3600) / 60))m"
     }
 }

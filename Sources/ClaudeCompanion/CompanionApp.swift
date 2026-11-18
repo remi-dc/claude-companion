@@ -8,7 +8,10 @@ struct CompanionApp: App {
             MenuBarView()
                 .environmentObject(state)
         } label: {
-            Image(systemName: state.config.paused ? "bell.slash" : state.activeAccount.symbol)
+            let needs = state.liveSessions.first { $0.mood == .needs }
+            Image(nsImage: MenuBarIcon.image(
+                mood: state.mood, paused: state.config.paused, frame: state.iconFrame,
+                badge: needs.map { NSColor(state.config.color(for: $0.accountID)) }))
         }
         .menuBarExtraStyle(.window)
     }
