@@ -3,7 +3,7 @@
 A small macOS menu bar app for people who use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with more than one account. It also helps if you just don't want to keep checking the terminal.
 
 - **Account switcher.** Pick Personal, Work or Backup (or add your own) from the menu bar. New `claude` sessions use that account.
-- **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message. Clicking one brings the session's app (Terminal, VS Code…) to the front.
+- **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message. Clicking one takes you to that exact session: the right Terminal or iTerm2 tab, or the right VS Code (or Cursor/Windsurf) window with the Claude conversation open. The first time, macOS asks to let Claude Companion control Terminal; that's what selects the right tab.
 - **A menu bar popover** in a warm "Ember" style: account avatars, the 5-hour window as a ring, today's cost, a 7-day trend, and an activity feed with an **Open** button for sessions waiting on you. The menu bar icon shows when Claude is working or needs you.
 - **A different sound** for each account and event, so you can tell which account finished without looking. You can import your own sounds.
 - **Flick**, a little animated ember who shows what Claude is doing: he flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when it's quiet. His friendly messages can be turned off in Settings › Flick.
@@ -67,6 +67,12 @@ APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
 "$APP" open popover       # show the menu bar popover in a regular window (handy for screenshots)
 "$APP" render-icon <dir>  # write the app icon PNGs (used by build.sh)
 ```
+
+## Troubleshooting
+
+- **No notifications from real sessions, but the test buttons work:** the hooks aren't installed. The popover shows an orange banner with **Install** when that's the case. Sessions opened before installing need a restart, because Claude Code loads hooks when a session starts.
+- **Notifications appear in Notification Center but don't pop up:** your display is probably mirrored or shared. Turn on "Allow notifications when mirroring or sharing the display" in System Settings › Notifications.
+- **See what a hook sends:** `echo '{"cwd":"/tmp/x"}' | CLAUDE_COMPANION_DEBUG=1 "/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion" hook stop --account personal`
 
 ## Limitations
 
