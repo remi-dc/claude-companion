@@ -7,6 +7,8 @@ import SwiftUI
 enum Demo {
     static var outDir: String?
     static var dark = false
+    /// When set, only the Settings window opens, on this pane (for screenshots).
+    static var settingsPane: String?
     static var isOn: Bool { outDir != nil }
 
     static func config() -> CompanionConfig {
@@ -84,7 +86,9 @@ enum Demo {
     static func run(_ state: AppState) {
         NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            for id in ["popover", "sessions", "dashboard"] { WindowManager.shared.show(id, state: state) }
+            for id in settingsPane == nil ? ["popover", "sessions", "dashboard"] : ["settings"] {
+                WindowManager.shared.show(id, state: state)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 guard let dir = outDir else { return }
                 try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)

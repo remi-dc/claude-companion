@@ -18,7 +18,7 @@ final class WindowManager {
         let (title, size, view): (String, NSSize, AnyView)
         switch id {
         case "settings":
-            (title, size, view) = ("Claude Companion Settings", NSSize(width: 720, height: 540),
+            (title, size, view) = ("Settings", NSSize(width: 820, height: 600),
                                    AnyView(SettingsView().environmentObject(state).environmentObject(state.updater).tint(Ember.accent)))
         case "sessions":
             (title, size, view) = ("Sessions", NSSize(width: 560, height: 520),

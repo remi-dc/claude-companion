@@ -41,6 +41,7 @@ enum Entry {
         if args.count > 2 && args[1] == "demo-shots" {
             Demo.outDir = args[2]
             Demo.dark = args.count > 3 && args[3] == "dark"
+            Demo.settingsPane = args.count > 4 ? args[4] : nil
             CompanionApp.main()
         }
         if args.count > 1 && args[1] == "usage" {
