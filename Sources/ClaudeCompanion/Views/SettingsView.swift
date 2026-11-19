@@ -114,6 +114,19 @@ private struct SoundsTab: View {
                     }
                     Text("On").font(.caption).foregroundStyle(.secondary)
                 }
+                GridRow {
+                    Text("Style").foregroundStyle(.secondary)
+                    ForEach(HookEvent.notifiable) { e in
+                        Picker("", selection: styleBinding(e)) {
+                            Text("Disappears").tag("banner")
+                            Text("Stays on screen").tag("sticky")
+                        }
+                        .labelsHidden()
+                        .frame(width: 140)
+                        .help("Stays on screen: a card in the top-right corner that stays until you click it, and goes away by itself once the session moves on.")
+                    }
+                    Text("")
+                }
                 Divider()
                 ForEach(state.config.accounts) { account in
                     GridRow {
@@ -154,6 +167,11 @@ private struct SoundsTab: View {
                     state.update(a)
                     Sounds.play(new)
                 })
+    }
+
+    private func styleBinding(_ e: HookEvent) -> Binding<String> {
+        Binding(get: { state.config.notificationStyles[e.rawValue] ?? "banner" },
+                set: { state.config.notificationStyles[e.rawValue] = $0 })
     }
 
     private func enabledBinding(_ account: Account) -> Binding<Bool> {

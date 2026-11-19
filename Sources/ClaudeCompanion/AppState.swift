@@ -210,13 +210,23 @@ final class AppState: ObservableObject {
                 sessions.removeValue(forKey: k)
             }
         }
+        // Anything new from this session resolves its sticky card (e.g. you approved the permission).
+        StickyNotes.shared.dismiss(key)
         guard msg.event != .started else { return }
 
         recent.insert(msg, at: 0)
         if recent.count > 30 { recent.removeLast(recent.count - 30) }
         let account = config.account(msg.accountID)
         guard !config.paused, account?.notificationsEnabled != false else { return }
-        notifier.post(msg, account: account, preview: config.showMessagePreview, palette: flickPalette)
+        if config.isSticky(msg.event) {
+            if let account { Sounds.play(account.sound(for: msg.event)) }
+            StickyNotes.shared.show(StickyNotes.Note(
+                id: key, title: "\(msg.event.title) · \(msg.project)", subtitle: account?.name ?? msg.accountID,
+                body: config.showMessagePreview ? msg.body : "",
+                mood: msg.event == .permission ? .needs : .done, palette: flickPalette, location: msg.location))
+        } else {
+            notifier.post(msg, account: account, preview: config.showMessagePreview, palette: flickPalette)
+        }
         // A finished turn usually means new usage on disk.
         if msg.event == .finished { refreshUsage() }
     }

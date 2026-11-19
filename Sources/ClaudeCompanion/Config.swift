@@ -98,6 +98,10 @@ struct CompanionConfig: Codable {
     /// Action id → shortcut. A missing entry means the shortcut is off.
     var shortcuts: [String: Shortcut] = Shortcut.defaults
     var flick = FlickSettings()
+    /// Event → "banner" (disappears) or "sticky" (stays on screen until dismissed or resolved).
+    var notificationStyles: [String: String] = ["permission": "sticky"]
+
+    func isSticky(_ event: HookEvent) -> Bool { notificationStyles[event.rawValue] == "sticky" }
 
     init(accounts: [Account], activeAccountID: String, paused: Bool, showMessagePreview: Bool, friendlyMessages: Bool) {
         self.accounts = accounts
@@ -119,6 +123,7 @@ struct CompanionConfig: Codable {
         alerts = (try? c.decodeIfPresent(AlertSettings.self, forKey: .alerts)) ?? AlertSettings()
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? Shortcut.defaults
         flick = (try? c.decodeIfPresent(FlickSettings.self, forKey: .flick)) ?? FlickSettings()
+        notificationStyles = (try? c.decodeIfPresent([String: String].self, forKey: .notificationStyles)) ?? ["permission": "sticky"]
     }
 
     static var defaults: CompanionConfig {
