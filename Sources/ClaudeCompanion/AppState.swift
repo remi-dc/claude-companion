@@ -5,6 +5,7 @@ import SwiftUI
 final class AppState: ObservableObject {
     @Published var config: CompanionConfig {
         didSet {
+            guard !Demo.isOn else { return }
             config.save()
             Integration.writeActiveFile(activeAccount)
             if config.shortcuts != oldValue.shortcuts { registerShortcuts() }
@@ -34,6 +35,16 @@ final class AppState: ObservableObject {
     private var iconTimer: Timer?
 
     init() {
+        if Demo.isOn {
+            // Made-up data for README screenshots: no files, hooks, shortcuts or network.
+            config = Demo.config()
+            usage = Demo.usage()
+            sessions = Demo.sessions()
+            recent = Demo.recent()
+            lastScan = Date()
+            DispatchQueue.main.async { Demo.run(self) }
+            return
+        }
         config = CompanionConfig.load()
         config.save()
         Integration.writeActiveFile(activeAccount)
@@ -247,6 +258,7 @@ final class AppState: ObservableObject {
     }
 
     func refreshUsage() {
+        if Demo.isOn { return }
         guard !isScanning else { return }
         isScanning = true
         scanner.scan(config.accounts) { [weak self] result in

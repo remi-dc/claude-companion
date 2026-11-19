@@ -1,20 +1,102 @@
-# Claude Companion
+<p align="center">
+  <img src="docs/images/icon.png" width="128" height="128" alt="Claude Companion app icon">
+</p>
 
-A small macOS menu bar app for people who use [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with more than one account. It also helps if you just don't want to keep checking the terminal.
+<h1 align="center">Claude Companion</h1>
 
-- **Account switcher.** Pick Personal, Work or Backup (or add your own) from the menu bar. New `claude` sessions use that account.
-- **Notifications** when Claude finishes, needs permission, or is waiting for you. Each one shows the account, the project and Claude's last message. Clicking one takes you to that exact session: the right Terminal or iTerm2 tab, or the right VS Code (or Cursor/Windsurf) window with the Claude conversation open. The first time, macOS asks to let Claude Companion control Terminal; that's what selects the right tab.
-- **A menu bar popover** in a warm "Ember" style: account avatars, the 5-hour window as a ring, today's cost, a 7-day trend, and an activity feed with an **Open** button for sessions waiting on you. The menu bar icon shows when Claude is working or needs you.
-- **Notifications that stay or go:** for each kind of event, choose *Disappears* (a normal macOS banner) or *Stays on screen* (a card in the top-right corner that stays until you click it, and clears itself once the session moves on, e.g. after you approve the permission). By default, permission requests stay.
-- **A different sound** for each account and event, so you can tell which account finished without looking. You can import your own sounds.
-- **Flick**, a little animated ember who shows what Claude is doing: he flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when it's quiet. His friendly messages can be turned off in Settings › Flick.
-- **Sessions window** (⌥⌘S): every running and recent session across accounts, with how long it has run, what it cost, and a button to jump back to it.
-- **Usage alerts** you can turn on or off one by one: monthly budget per account (80% and 100%), a busy 5-hour window, a window that just reset, and a daily summary.
-- **Global shortcuts** you can record yourself: switch accounts (⌥⌘1/2/3 by default), open the menu (⌥⌘C), show sessions (⌥⌘S).
-- **Make Flick yours:** Ember, Glacier, Mint or the active account's color; small, medium or large; and a calm mode that keeps him still.
-- **Usage dashboard** for all accounts: the current 5-hour window, today, and the last 7 or 30 days. It includes a daily chart and breakdowns by model and project. Export any view as CSV.
+<p align="center">
+  <b>A little menu bar companion for Claude Code on macOS.</b><br>
+  Switch accounts, know the moment Claude needs you, and see what you use.<br>
+  Flick keeps an eye on things while you look away.
+</p>
 
-> Unofficial community project. Not affiliated with or endorsed by Anthropic.
+<p align="center">
+  <a href="https://github.com/remi-dc/claude-companion/releases/latest"><img src="https://img.shields.io/github/v/release/remi-dc/claude-companion?color=D9653B&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-1D1D1F?logo=apple&logoColor=white" alt="macOS 14 or later">
+  <img src="https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-555" alt="Universal app">
+  <img src="https://img.shields.io/badge/SwiftUI-native-F05138?logo=swift&logoColor=white" alt="Native SwiftUI">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/remi-dc/claude-companion?color=2A78D6" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/popover.png">
+    <img src="docs/images/light/popover.png" width="330" alt="The menu bar popover: Flick, account switcher, 5-hour window ring, today's cost, 7-day trend and activity feed">
+  </picture>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/sessions.png">
+    <img src="docs/images/light/sessions.png" width="470" alt="The Sessions window: running and recent Claude sessions across accounts with duration, cost and an Open button">
+  </picture>
+</p>
+
+<p align="center">
+  <code>curl -fsSL https://raw.githubusercontent.com/remi-dc/claude-companion/main/install.sh | sh</code>
+</p>
+
+---
+
+## Meet Flick
+
+Flick is a small ember who lives in your menu bar and shows what Claude is doing across all your sessions.
+
+<p align="center">
+  <img src="docs/images/flick.png" width="720" alt="Flick's five moods: idle, working, needs you, done and sleeping">
+</p>
+
+He flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when things are quiet. Pick his color (Ember, Glacier, Mint or your account's color) and size, turn his friendly messages off, or keep him still in calm mode.
+
+## What it does
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 👥 Accounts
+- **Switch** between Personal, Work and Backup (or your own) from the menu bar or a shortcut.
+- Works for the `claude` command **and** the VS Code, Cursor and Windsurf extensions.
+- **Sign in with** the right browser or Chrome profile for each account.
+
+</td>
+<td width="50%" valign="top">
+
+### 🔔 Notifications
+- When Claude **finishes**, **needs permission** or is **waiting** for you.
+- **Click to jump** to the exact Terminal tab or VS Code conversation.
+- Each event either **disappears** or **stays on screen** until it's handled.
+- A **different sound** per account and event.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 📊 Usage
+- The **5-hour window**, today, 7 and 30 days, by account, model and project.
+- A **Sessions** window with live timers and cost per session.
+- **Alerts** you switch on one by one: monthly budget, busy window, window reset, daily summary.
+- **Export** to CSV.
+
+</td>
+<td width="50%" valign="top">
+
+### ✨ Comfort
+- **Global shortcuts** you record yourself (⌥⌘1/2/3, ⌥⌘C, ⌥⌘S by default).
+- **Built-in updates**: one click, verified, relaunches itself.
+- Light on your Mac: **~0% CPU** when idle; hooks return in milliseconds.
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/dashboard.png">
+    <img src="docs/images/light/dashboard.png" width="820" alt="The usage dashboard: totals, per-account 5-hour windows, a daily cost chart stacked by account, and breakdowns by model and project">
+  </picture>
+</p>
+
+<sub>Screenshots use the app's built-in demo data, not real accounts.</sub>
 
 ## Install
 
@@ -24,15 +106,14 @@ Paste this in Terminal:
 curl -fsSL https://raw.githubusercontent.com/remi-dc/claude-companion/main/install.sh | sh
 ```
 
-It downloads the latest release (a universal app for Apple Silicon and Intel), installs it in `/Applications` and launches it. Then click the chat-bubble icon in the menu bar and **Install** in the orange banner. That's it.
+Then click the chat-bubble icon in the menu bar and **Install** in the orange banner. That's it.
 
-You need macOS 14 (Sonoma) or later and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You can [read the script](install.sh) before running it.
-
-**Updates are built in.** The app checks GitHub for a new release every few hours. When there is one, a banner in the popover offers **Update**: it downloads the new version, checks it, swaps it in and relaunches. You can also use Settings › Setup › **Check for updates**. The check is one anonymous request to GitHub's public API.
+You need **macOS 14 (Sonoma) or later** and [Claude Code](https://docs.anthropic.com/en/docs/claude-code). The installer downloads the latest release (a universal app), puts it in `/Applications` and launches it. You can [read the script](install.sh) first.
 
 > **Why a Terminal command and not a download link?** The app isn't notarized by Apple (that needs a paid developer account), so macOS blocks it when it's downloaded in a browser. Downloads made with `curl` don't get that block.
 
-### Build from source
+<details>
+<summary><b>Build from source</b></summary>
 
 Needs the Xcode Command Line Tools (`xcode-select --install`):
 
@@ -42,20 +123,19 @@ cd claude-companion
 ./scripts/build.sh --install   # builds, copies to /Applications, launches
 ```
 
-`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it; `--universal --zip` makes a release zip. The app icon is generated from code, so there are no image assets to manage. The app has no Dock icon; look for it in the menu bar.
+`./scripts/build.sh` on its own builds `build/Claude Companion.app` without installing it; `--universal --zip` makes a release zip. The app icon is generated from code. The app has no Dock icon; look for it in the menu bar.
+
+</details>
 
 ## Setup
 
-Open the menu bar icon → **Settings** → **Setup** and work through the steps:
+Open the menu bar icon → **Settings** → **Setup**:
 
-0. **Allow notifications.** macOS asks on first launch. If you missed the prompt, use **Open Notification Settings**. Until you allow them, you get plain AppleScript banners (shown as "Script Editor"). Sounds play either way.
-1. **Install hooks.** This adds `Stop`, `Notification`, `UserPromptSubmit` and `PostToolUse` hooks to each account's `settings.json`. The hooks hand events to the app in the background, so Claude waits only a few milliseconds. If you installed hooks with an earlier version, the button reads **Update hooks**. A `settings.json.companion-backup` copy is saved first, and your other settings and hooks are kept.
-2. **Install shell integration.** This installs a `claude` wrapper in `~/.claude-companion/bin` and adds one line to `~/.zshrc` to put it on your PATH. Open a new terminal tab afterwards.
-3. **VS Code** (optional). **Configure** sets the Claude Code extension's `claudeCode.claudeProcessWrapper` setting so the extension follows the active account too. It also works for Cursor, Windsurf and VS Code Insiders. Your editor settings keep their comments and formatting, and a backup is saved.
-4. **Log in to each account.** Go to Settings → Accounts → **Log in…** and type `/login` in the Terminal window that opens. If you use several browser profiles (say a Work profile in Chrome), pick it under **Sign in with** for that account first: the sign-in page then opens there, both for **Log in…** and for `/login` inside a session.
-5. **Test.** The buttons send sample notifications.
-
-Default accounts:
+1. **Allow notifications** when macOS asks (or use **Open Notification Settings**).
+2. **Install hooks**: lets Claude Code tell the app what's happening. Your existing settings and hooks are kept, and a backup is saved.
+3. **Install shell integration**: the `claude` command follows the account picked in the menu bar.
+4. **VS Code** (optional): the Claude Code extension follows it too (also Cursor, Windsurf, Insiders).
+5. **Log in to each account**: Settings › Accounts › **Log in…**, then `/login`. Pick a browser profile under **Sign in with** first if you use several.
 
 | Account | Config directory | "Finished" sound |
 | --- | --- | --- |
@@ -63,77 +143,85 @@ Default accounts:
 | Work | `~/.claude-work` | Hero |
 | Backup | `~/.claude-backup` | Purr |
 
-You can rename accounts, change their directories, or add more in Settings → Accounts. Re-run **Install hooks** after adding one.
+Rename accounts, change their folders or add more in Settings › Accounts (then **Install hooks** again).
 
-## How it works
+<details>
+<summary><b>How it works</b></summary>
 
-**Account switching.** Each account is a separate Claude Code config directory (`CLAUDE_CONFIG_DIR`), so it has its own login, settings and history. The menu bar writes the active directory to `~/.claude-companion/active-config-dir`. The `claude` wrapper reads that file, exports `CLAUDE_CONFIG_DIR`, and runs the real `claude`. The Personal account (`~/.claude`) leaves the variable unset. The wrapper does nothing if you've set `CLAUDE_CONFIG_DIR` yourself or set `CLAUDE_COMPANION_BYPASS=1`. In VS Code, the extension runs `claude-vscode-wrapper <bundled claude> <args>`. That wrapper applies the same rule and then runs the bundled binary.
+**Account switching.** Each account is a separate Claude Code config directory (`CLAUDE_CONFIG_DIR`), with its own login, settings and history. The menu bar writes the active one to `~/.claude-companion/active-config-dir`; the `claude` wrapper reads it, exports `CLAUDE_CONFIG_DIR` and runs the real `claude` (Personal leaves it unset). The wrapper steps aside if you set `CLAUDE_CONFIG_DIR` yourself or `CLAUDE_COMPANION_BYPASS=1`. In VS Code, the extension runs `claude-vscode-wrapper <bundled claude> <args>`, which applies the same rule. For sign-in, the wrappers set `$BROWSER` to the account's browser profile.
 
-**Notifications.** The hooks run `~/.claude-companion/bin/claude-companion-hook`, a tiny shim that calls the app binary in CLI mode. The app rewrites the shim on every launch, so moving the app doesn't break it. The CLI reads the hook JSON from stdin and passes the event to the running app, which plays the account's sound and posts the notification. If the app isn't running, the CLI shows an AppleScript notification itself. Hooks exit 0 in well under a second and never block Claude.
+**Notifications.** `Stop`, `Notification`, `UserPromptSubmit` and `PostToolUse` hooks run `~/.claude-companion/bin/claude-companion-hook`, a tiny shim that hands the event to the app in the background, so Claude never waits. The app works out each session's state (Flick's mood), plays the account's sound and shows the notification. It also records where the session runs (app, folder, terminal) so a click can take you back there.
 
-**Usage.** The app reads Claude Code's local transcripts in `<config dir>/projects/**/*.jsonl` (last 35 days). It removes duplicate responses and prices tokens at Anthropic API list prices, including cache reads and writes. It refreshes every minute and after each finished turn.
+**Usage.** The app reads Claude Code's local transcripts (`<config dir>/projects/**/*.jsonl`, last 35 days), only the new lines on each pass, removes duplicates and prices tokens at Anthropic API list prices, cache included.
 
-## Command line
+**Updates.** Every few hours the app asks GitHub's public API for the latest release (one anonymous request). Updating downloads the zip, checks the bundle id, version and signature, swaps the app and relaunches; if anything fails, the old version is put back.
 
-The app binary has a few CLI subcommands:
+</details>
+
+<details>
+<summary><b>Command line</b></summary>
 
 ```sh
 APP="/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion"
-"$APP" usage              # per-account usage summary in the terminal
-"$APP" check-update       # compare with the latest GitHub release
-"$APP" open dashboard     # show the dashboard (or: open settings)
-"$APP" open popover       # show the menu bar popover in a regular window (handy for screenshots)
-"$APP" render-icon <dir>  # write the app icon PNGs (used by build.sh)
+"$APP" usage                   # per-account usage summary in the terminal
+"$APP" check-update            # compare with the latest GitHub release
+"$APP" open dashboard          # or: open settings, open sessions, open popover
+"$APP" demo-shots <dir> [dark] # run on demo data and list its windows (README screenshots)
+"$APP" render-icon <dir>       # write the app icon PNGs (used by build.sh)
 ```
 
-## Publishing a release (maintainers)
+</details>
 
-```sh
-./scripts/release.sh 1.2.0 "What's new, in one line"
-```
+<details>
+<summary><b>Troubleshooting</b></summary>
 
-It bumps the version, builds the universal app, commits, pushes and creates the GitHub release. Every running copy then offers the update within a few hours. It needs the [GitHub CLI](https://cli.github.com) (`gh auth login`).
+- **No notifications from real sessions, but the test buttons work:** the hooks aren't installed (the popover shows an orange **Install** banner). Sessions opened before installing need a restart.
+- **Notifications land in Notification Center but don't pop up:** your display is probably mirrored or shared. Turn on "Allow notifications when mirroring or sharing the display" in System Settings › Notifications.
+- **"Stays on screen" cards show during Focus:** they're drawn by the app, so Focus modes don't hide them. Set that event to *Disappears* if you prefer macOS to handle it.
+- **See what a hook sends:** `echo '{"cwd":"/tmp/x"}' | CLAUDE_COMPANION_DEBUG=1 "$APP" hook stop --account personal`
 
-## Troubleshooting
+</details>
 
-- **No notifications from real sessions, but the test buttons work:** the hooks aren't installed. The popover shows an orange banner with **Install** when that's the case. Sessions opened before installing need a restart, because Claude Code loads hooks when a session starts.
-- **Notifications appear in Notification Center but don't pop up:** your display is probably mirrored or shared. Turn on "Allow notifications when mirroring or sharing the display" in System Settings › Notifications.
-- **See what a hook sends:** `echo '{"cwd":"/tmp/x"}' | CLAUDE_COMPANION_DEBUG=1 "/Applications/Claude Companion.app/Contents/MacOS/ClaudeCompanion" hook stop --account personal`
-
-## Limitations
+<details>
+<summary><b>Limitations</b></summary>
 
 - The **Claude desktop app** always uses the Personal account (`~/.claude`). Notifications still work for it.
-- **Sessions that are already running** keep their account. Switching only affects new terminal sessions and new VS Code conversations.
-- **Costs are estimates** at API list prices. Subscription plans (Pro or Max) aren't billed per token, and your plan's actual usage-limit percentage isn't stored locally. Use the numbers to compare accounts and spot heavy sessions.
-- Model prices are hard-coded in `Sources/ClaudeCompanion/Usage.swift`. Update them when pricing changes.
+- **Running sessions keep their account**; switching affects new sessions.
+- **Costs are estimates** at API list prices. Pro and Max plans aren't billed per token, and your plan's real usage-limit percentage isn't stored locally.
+- Model prices live in `Sources/ClaudeCompanion/Usage.swift`.
 
-## Uninstall
+</details>
 
-1. Settings → Setup → **Remove hooks**, and **Remove** next to each configured editor
-2. Delete the `# Claude Companion` line from `~/.zshrc`
-3. Quit the app, then delete `/Applications/Claude Companion.app` and `~/.claude-companion`
+<details>
+<summary><b>Uninstall</b></summary>
 
-Your Claude Code config directories, logins and history are left as they are. The `*.companion-backup` files next to your settings can be deleted once you're happy.
+1. Settings → Setup → **Remove hooks**, and **Remove** next to each configured editor.
+2. Delete the `# Claude Companion` line from `~/.zshrc`.
+3. Quit the app, then delete `/Applications/Claude Companion.app` and `~/.claude-companion`.
 
-## Project layout
+Your Claude Code folders, logins and history stay as they are. The `*.companion-backup` files can be deleted once you're happy.
 
-```text
-Sources/ClaudeCompanion/
-  Entry.swift          app entry point and CLI subcommands
-  HookCLI.swift        hook handler (runs inside Claude Code's hook)
-  Integration.swift    settings.json hooks, claude wrapper, login helper
-  Notifier.swift       notifications and sounds
-  Flick.swift          the animated mascot
-  Theme.swift          Ember colors and shared styles
-  MenuBarIcon.swift    menu bar glyph and its states
-  AppIcon.swift        app icon, rendered at build time
-  Usage.swift          transcript parser, pricing, aggregations
-  AppState.swift       app state
-  WindowManager.swift  dashboard and settings windows
-  Views/               menu bar, dashboard, settings
-scripts/build.sh       builds the .app bundle
+</details>
+
+<details>
+<summary><b>For maintainers</b></summary>
+
+Publish a release (bumps the version, builds the universal app, commits, pushes, creates the GitHub release; every running copy then offers the update):
+
+```sh
+./scripts/release.sh 1.5.0 "What's new, in one line"
 ```
 
-## License
+Refresh the README screenshots from demo data:
 
-MIT. See [LICENSE](LICENSE).
+```sh
+./scripts/build.sh && "build/Claude Companion.app/Contents/MacOS/ClaudeCompanion" demo-shots /tmp/shots
+```
+
+</details>
+
+---
+
+<p align="center">
+  <sub>Unofficial community project, not affiliated with or endorsed by Anthropic. MIT licensed, see <a href="LICENSE">LICENSE</a>.</sub>
+</p>

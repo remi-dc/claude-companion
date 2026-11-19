@@ -118,7 +118,7 @@ struct MenuBarView: View {
     /// Without hooks Claude Code never tells us anything, so say so loudly.
     @ViewBuilder private var setupBanner: some View {
         let _ = state.statusTick
-        let missing = state.config.accounts.filter { !Integration.hooksUpToDate(for: $0) }
+        let missing = Demo.isOn ? [] : state.config.accounts.filter { !Integration.hooksUpToDate(for: $0) }
         if !missing.isEmpty {
             let anyInstalled = missing.contains { Integration.hooksInstalled(for: $0) }
             HStack(spacing: 10) {
