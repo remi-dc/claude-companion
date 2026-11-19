@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
             guard !Demo.isOn else { return }
             config.save()
             Integration.writeActiveFile(activeAccount)
+            Integration.writeWrapperData(config)
             if config.shortcuts != oldValue.shortcuts { registerShortcuts() }
         }
     }
@@ -48,6 +49,7 @@ final class AppState: ObservableObject {
         config = CompanionConfig.load()
         config.save()
         Integration.writeActiveFile(activeAccount)
+        Integration.writeWrapperData(config)
         Integration.writeHookShim()
         Integration.refreshInstalledWrappers()
         notifier.requestAuthorization()
@@ -181,6 +183,24 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Editors can't ask before a session starts, so show which account it's on, with a way to switch.
+    private func remindAccount(for msg: HookMessage, key: String) {
+        guard let account = config.account(msg.accountID) else { return }
+        let others = config.accounts.filter { $0.id != account.id }
+        StickyNotes.shared.show(StickyNotes.Note(
+            id: "reminder-" + key,
+            title: "This session is on \(account.name)",
+            subtitle: account.loggedInEmail ?? msg.project,
+            body: (config.friendlyMessages ? "Welcome back! " : "") + "Wrong account? Switch, and your next conversation uses it.",
+            mood: .idle, palette: flickPalette, location: nil,
+            actions: others.map { other in
+                (other.name, { [weak self] in
+                    self?.activate(other.id)
+                    StickyNotes.shared.dismiss("reminder-" + key)
+                })
+            }))
+    }
+
     /// Brings the app hosting a session (Terminal, VS Code…) to the front.
     func open(_ session: SessionStatus) {
         Navigator.go(to: session.location)
@@ -197,6 +217,15 @@ final class AppState: ObservableObject {
     func handle(_ msg: HookMessage) {
         now = Date()
         let key = msg.sessionID ?? "\(msg.accountID)/\(msg.project)"
+        // How long since Claude was last used (any account), for the "after a break" reminder.
+        let lastEvent = UserDefaults.standard.object(forKey: "lastEventDate") as? Date ?? .distantPast
+        UserDefaults.standard.set(msg.date, forKey: "lastEventDate")
+        if msg.event == .started, sessions[key] == nil, config.reminderHours > 0,
+           msg.date.timeIntervalSince(lastEvent) > Double(config.reminderHours) * 3600,
+           msg.tty == nil,                                          // terminals already asked at launch
+           msg.cwd.flatMap({ config.ruleAccount(for: $0) }) == nil { // a folder rule decided: nothing to confirm
+            remindAccount(for: msg, key: key)
+        }
         let mood: FlickMood
         switch msg.event {
         case .started: mood = .working

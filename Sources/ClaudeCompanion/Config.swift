@@ -102,6 +102,20 @@ struct CompanionConfig: Codable {
     var notificationStyles: [String: String] = ["permission": "sticky"]
 
     func isSticky(_ event: HookEvent) -> Bool { notificationStyles[event.rawValue] == "sticky" }
+    /// Projects inside these folders always use the given account (longest match wins).
+    var folderRules: [FolderRule] = []
+    /// After this many hours without Claude activity, confirm the account when a session starts. 0 = off.
+    var reminderHours = 4
+    /// A dot in the active account's color on the menu bar icon.
+    var showAccountInMenuBar = true
+
+    /// The account a folder rule assigns to `path`, if any.
+    func ruleAccount(for path: String) -> Account? {
+        folderRules
+            .filter { r in let f = r.expandedFolder; return path == f || path.hasPrefix(f + "/") }
+            .max { $0.expandedFolder.count < $1.expandedFolder.count }
+            .flatMap { account($0.accountID) }
+    }
 
     init(accounts: [Account], activeAccountID: String, paused: Bool, showMessagePreview: Bool, friendlyMessages: Bool) {
         self.accounts = accounts
@@ -124,6 +138,9 @@ struct CompanionConfig: Codable {
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? Shortcut.defaults
         flick = (try? c.decodeIfPresent(FlickSettings.self, forKey: .flick)) ?? FlickSettings()
         notificationStyles = (try? c.decodeIfPresent([String: String].self, forKey: .notificationStyles)) ?? ["permission": "sticky"]
+        folderRules = (try? c.decodeIfPresent([FolderRule].self, forKey: .folderRules)) ?? []
+        reminderHours = (try? c.decodeIfPresent(Int.self, forKey: .reminderHours)) ?? 4
+        showAccountInMenuBar = (try? c.decodeIfPresent(Bool.self, forKey: .showAccountInMenuBar)) ?? true
     }
 
     static var defaults: CompanionConfig {
@@ -236,5 +253,19 @@ struct FlickSettings: Codable, Equatable {
 
     var popoverSize: CGFloat {
         switch size { case "small": return 42; case "large": return 68; default: return 54 }
+    }
+}
+
+// MARK: Folder rules
+
+struct FolderRule: Codable, Identifiable, Hashable {
+    var id = UUID()
+    var folder: String
+    var accountID: String
+
+    var expandedFolder: String {
+        var p = (folder as NSString).expandingTildeInPath
+        while p.count > 1 && p.hasSuffix("/") { p.removeLast() }
+        return p
     }
 }

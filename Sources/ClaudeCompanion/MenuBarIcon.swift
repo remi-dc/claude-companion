@@ -4,9 +4,9 @@ import SwiftUI
 /// The menu bar glyph: a monochrome chat bubble, like the system icons.
 /// Working: three dots cycle. Needs you: a badge in the account's color. Paused: slashed.
 enum MenuBarIcon {
-    static func image(mood: FlickMood, paused: Bool, frame: Int, badge: NSColor?) -> NSImage {
+    static func image(mood: FlickMood, paused: Bool, frame: Int, badge: NSColor?, accountDot: NSColor? = nil) -> NSImage {
         let size = NSSize(width: 22, height: 20)
-        let colored = badge != nil && !paused
+        let colored = (badge != nil && !paused) || accountDot != nil
         let image = NSImage(size: size, flipped: true) { _ in
             let ink: NSColor = colored ? .labelColor : .black
             let bubble = NSBezierPath()
@@ -39,6 +39,12 @@ enum MenuBarIcon {
                     ink.withAlphaComponent(i == frame % 3 ? 1 : 0.3).setFill()
                     NSBezierPath(ovalIn: NSRect(x: 5.8 + Double(i) * 3, y: 7.3, width: 2.4, height: 2.4)).fill()
                 }
+            }
+
+            if let accountDot {
+                // The active account's color, bottom right.
+                accountDot.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 15.2, y: 12.6, width: 6, height: 6)).fill()
             }
 
             if let badge, !paused {

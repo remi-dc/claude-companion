@@ -31,6 +31,8 @@ private struct AccountsTab: View {
                 }
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
+            .frame(minHeight: 180)
+            FolderRulesSection()
             HStack {
                 Button { state.addAccount() } label: { Label("Add account", systemImage: "plus") }
                 Spacer()
@@ -514,5 +516,65 @@ private struct ShortcutsTab: View {
 
     private func binding(_ id: String) -> Binding<Shortcut?> {
         Binding(get: { state.config.shortcuts[id] }, set: { state.config.shortcuts[id] = $0 })
+    }
+}
+
+// MARK: Folder rules & reminder
+
+private struct FolderRulesSection: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Folder rules").font(.headline)
+                Spacer()
+                Button { addRule() } label: { Label("Add folder…", systemImage: "folder.badge.plus") }
+            }
+            Text("Projects inside these folders always use their account, whatever is picked in the menu bar (the deepest folder wins).")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach($state.config.folderRules) { $rule in
+                HStack(spacing: 8) {
+                    Image(systemName: "folder").foregroundStyle(.secondary)
+                    Text(rule.folder.replacingOccurrences(of: Paths.home, with: "~"))
+                        .font(.system(.callout, design: .monospaced))
+                        .lineLimit(1).truncationMode(.middle)
+                    Spacer()
+                    Image(systemName: "arrow.right").foregroundStyle(.tertiary)
+                    Picker("", selection: $rule.accountID) {
+                        ForEach(state.config.accounts) { Text($0.name).tag($0.id) }
+                    }
+                    .labelsHidden().frame(width: 120)
+                    Button(role: .destructive) {
+                        state.config.folderRules.removeAll { $0.id == rule.id }
+                    } label: { Image(systemName: "minus.circle") }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Remove rule")
+                }
+            }
+            Divider().padding(.vertical, 4)
+            HStack(spacing: 16) {
+                Picker("After a break, confirm the account", selection: $state.config.reminderHours) {
+                    Text("Off").tag(0)
+                    ForEach([1, 2, 4, 8, 12, 24], id: \.self) { Text("\($0) h").tag($0) }
+                }
+                .frame(maxWidth: 330)
+                .help("When you haven't used Claude for this long, the terminal asks which account to use (Enter keeps it), and editors show a card with a switch button.")
+                Toggle("Account color in the menu bar", isOn: $state.config.showAccountInMenuBar)
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Ember.card))
+    }
+
+    private func addRule() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use this folder"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        state.config.folderRules.append(FolderRule(folder: url.path, accountID: state.activeAccount.id))
     }
 }

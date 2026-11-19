@@ -56,6 +56,8 @@ He flickers while Claude works, hops when a session needs your OK, cheers when i
 - **Switch** between Personal, Work and Backup (or your own) from the menu bar or a shortcut.
 - Works for the `claude` command **and** the VS Code, Cursor and Windsurf extensions.
 - **Sign in with** the right browser or Chrome profile for each account.
+- **Folder rules**: projects in `~/Work` always use Work, whatever is picked.
+- **After a break**, it checks which account you're about to use (one key press).
 
 </td>
 <td width="50%" valign="top">
@@ -147,6 +149,8 @@ Rename accounts, change their folders or add more in Settings › Accounts (then
 
 <details>
 <summary><b>How it works</b></summary>
+
+**Which account a session uses.** First, folder rules (the deepest matching folder wins). Otherwise, the account picked in the menu bar. After a break (4 h by default, set in Settings › Accounts), the terminal asks before starting (Enter keeps the account, a number switches for that session); editors can't ask first, so a card shows which account the new conversation is on, with buttons to switch for the next one. The menu bar icon carries a dot in the active account's color.
 
 **Account switching.** Each account is a separate Claude Code config directory (`CLAUDE_CONFIG_DIR`), with its own login, settings and history. The menu bar writes the active one to `~/.claude-companion/active-config-dir`; the `claude` wrapper reads it, exports `CLAUDE_CONFIG_DIR` and runs the real `claude` (Personal leaves it unset). The wrapper steps aside if you set `CLAUDE_CONFIG_DIR` yourself or `CLAUDE_COMPANION_BYPASS=1`. In VS Code, the extension runs `claude-vscode-wrapper <bundled claude> <args>`, which applies the same rule. For sign-in, the wrappers set `$BROWSER` to the account's browser profile.
 

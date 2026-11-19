@@ -16,6 +16,8 @@ final class StickyNotes {
         let mood: FlickMood
         let palette: FlickPalette
         let location: SessionLocation?
+        /// Extra buttons (title, action), e.g. "switch to Work".
+        var actions: [(String, () -> Void)] = []
     }
 
     private var panels: [(id: String, panel: NSPanel)] = []
@@ -111,6 +113,14 @@ private struct StickyCard: View {
                 Text(note.subtitle).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                 if !note.body.isEmpty {
                     Text(note.body).font(.system(size: 12)).lineLimit(2).padding(.top, 1)
+                }
+                if !note.actions.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(Array(note.actions.enumerated()), id: \.offset) { _, action in
+                            Button(action.0, action: action.1).buttonStyle(EmberPillStyle()).font(.system(size: 12))
+                        }
+                    }
+                    .padding(.top, 4)
                 }
             }
             Spacer(minLength: 0)
