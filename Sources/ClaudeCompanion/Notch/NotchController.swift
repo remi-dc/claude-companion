@@ -94,6 +94,9 @@ final class NotchModel: ObservableObject {
     @Published private(set) var alert: NotchAlert?
     /// A lasting alert (permission) folds into the menu bar after a few seconds instead of covering your windows.
     @Published private(set) var alertCollapsed = false
+    /// The pointer is on the card: keep it (no countdown, no tabs taking over).
+    @Published var hoveringAlert = false
+    private var unfoldedByHover = false
     private var collapseTask: DispatchWorkItem?
     @Published var isPrivate = false
     @Published var geometry = NotchGeometry(hasNotch: false, notchWidth: 120, height: 24, screenFrame: .zero)
@@ -136,10 +139,31 @@ final class NotchModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: task)
     }
 
+    /// Hovering a folded permission request opens the card again (not the tabs).
+    func unfold() {
+        guard alert != nil, alertCollapsed else { return }
+        collapseTask?.cancel()
+        unfoldedByHover = true
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) { alertCollapsed = false }
+    }
+
+    /// Fold it back a moment after the pointer leaves, if hovering is what opened it.
+    func refoldSoon() {
+        guard unfoldedByHover, let a = alert, a.stays, !alertCollapsed else { return }
+        unfoldedByHover = false
+        let task = DispatchWorkItem { [weak self] in
+            guard let self, self.alert?.id == a.id, !self.hoveringAlert else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { self.alertCollapsed = true }
+        }
+        collapseTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: task)
+    }
+
     private func scheduleDismiss(_ id: String, after seconds: Double) {
         let task = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            if self.expanded { self.scheduleDismiss(id, after: 4) } else { self.dismiss(id) }   // wait while you're looking
+            // Wait while you're looking at it.
+            if self.expanded || self.hoveringAlert { self.scheduleDismiss(id, after: 3) } else { self.dismiss(id) }
         }
         dismissTask = task
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: task)
@@ -280,6 +304,16 @@ final class NotchController {
         let rect = islandRect()
         panel.ignoresMouseEvents = !rect.contains(p)
         let near = rect.insetBy(dx: -6, dy: -6).contains(p)
+
+        // A card is showing: hovering it keeps it (and unfolds a folded one); it never turns into the tabs.
+        if model.alert != nil && !model.expanded {
+            hoverTask?.cancel()
+            hoverTask = nil
+            if model.hoveringAlert != near { model.hoveringAlert = near }
+            if near { model.unfold() } else { model.refoldSoon() }
+            return
+        }
+        if model.hoveringAlert { model.hoveringAlert = false }
 
         if !model.expanded {
             closeTask?.cancel()

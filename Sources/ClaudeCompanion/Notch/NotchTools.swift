@@ -100,6 +100,16 @@ final class CalendarProvider: ObservableObject {
         let start: Date
         let end: Date
         let joinURL: URL?
+        var calendarItemID: String? = nil
+
+        /// Shows the event in the Calendar app.
+        func open() {
+            if let id = calendarItemID, let url = URL(string: "ical://ekevent/\(id)?method=show&options=more"),
+               NSWorkspace.shared.open(url) { return }
+            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
+                NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+            }
+        }
     }
 
     @Published var events: [Event] = []
@@ -131,7 +141,8 @@ final class CalendarProvider: ObservableObject {
             .sorted { $0.startDate < $1.startDate }
             .prefix(12)
             .map { Event(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "Event",
-                         start: $0.startDate, end: $0.endDate, joinURL: Self.joinLink($0)) }
+                         start: $0.startDate, end: $0.endDate, joinURL: Self.joinLink($0),
+                         calendarItemID: $0.calendarItemIdentifier) }
     }
 
     /// Meet, Zoom or Teams link from the event's URL, location or notes.

@@ -522,6 +522,9 @@ private struct CalendarTab: View {
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(i == 0 ? 0.09 : 0.05)))
+                    .contentShape(Rectangle())
+                    .onTapGesture { e.open() }
+                    .help("Open in Calendar")
                 }
                 if calendar.events.isEmpty {
                     Text("Nothing in the next 7 days either.").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
