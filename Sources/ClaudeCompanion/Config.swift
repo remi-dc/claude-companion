@@ -108,6 +108,7 @@ struct CompanionConfig: Codable {
     var reminderHours = 4
     /// A dot in the active account's color on the menu bar icon.
     var showAccountInMenuBar = true
+    var notch = NotchSettings()
 
     /// The account a folder rule assigns to `path`, if any.
     func ruleAccount(for path: String) -> Account? {
@@ -141,6 +142,7 @@ struct CompanionConfig: Codable {
         folderRules = (try? c.decodeIfPresent([FolderRule].self, forKey: .folderRules)) ?? []
         reminderHours = (try? c.decodeIfPresent(Int.self, forKey: .reminderHours)) ?? 4
         showAccountInMenuBar = (try? c.decodeIfPresent(Bool.self, forKey: .showAccountInMenuBar)) ?? true
+        notch = (try? c.decodeIfPresent(NotchSettings.self, forKey: .notch)) ?? NotchSettings()
     }
 
     static var defaults: CompanionConfig {
@@ -267,5 +269,43 @@ struct FolderRule: Codable, Identifiable, Hashable {
         var p = (folder as NSString).expandingTildeInPath
         while p.count > 1 && p.hasSuffix("/") { p.removeLast() }
         return p
+    }
+}
+
+// MARK: Notch
+
+struct NotchSettings: Codable, Equatable {
+    /// "menubar", "notch" or "both".
+    var presentation = "menubar"
+    /// When the notch is on, show notifications and alerts there instead of macOS banners (sounds still play).
+    var notificationsInNotch = true
+    /// "builtin" (the screen with the notch) or "pointer" (the screen under the mouse).
+    var screen = "builtin"
+    /// Hide projects, messages, clipboard and shelf while the display is mirrored.
+    var privateWhenMirroring = true
+    /// Show what Claude is doing right now (editing a file, running a command…).
+    var liveActivity = true
+    var musicTab = true
+    var calendarTab = true
+    var shelfTab = true
+    var clipboardTab = true
+
+    var notchOn: Bool { presentation != "menubar" }
+    var menuBarOn: Bool { presentation != "notch" }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = NotchSettings()
+        presentation = (try? c.decodeIfPresent(String.self, forKey: .presentation)) ?? d.presentation
+        notificationsInNotch = (try? c.decodeIfPresent(Bool.self, forKey: .notificationsInNotch)) ?? d.notificationsInNotch
+        screen = (try? c.decodeIfPresent(String.self, forKey: .screen)) ?? d.screen
+        privateWhenMirroring = (try? c.decodeIfPresent(Bool.self, forKey: .privateWhenMirroring)) ?? d.privateWhenMirroring
+        liveActivity = (try? c.decodeIfPresent(Bool.self, forKey: .liveActivity)) ?? d.liveActivity
+        musicTab = (try? c.decodeIfPresent(Bool.self, forKey: .musicTab)) ?? d.musicTab
+        calendarTab = (try? c.decodeIfPresent(Bool.self, forKey: .calendarTab)) ?? d.calendarTab
+        shelfTab = (try? c.decodeIfPresent(Bool.self, forKey: .shelfTab)) ?? d.shelfTab
+        clipboardTab = (try? c.decodeIfPresent(Bool.self, forKey: .clipboardTab)) ?? d.clipboardTab
     }
 }

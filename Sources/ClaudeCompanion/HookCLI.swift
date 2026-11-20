@@ -17,13 +17,15 @@ struct HookMessage: Codable, Identifiable, Hashable {
     var appBundleID: String?
     var cwd: String?
     var tty: String?
+    /// What Claude is doing right now ("Editing parser.swift"), from the tool hooks.
+    var activity: String?
 
     var location: SessionLocation {
         SessionLocation(appBundleID: appBundleID, cwd: cwd, tty: tty, sessionID: sessionID)
     }
 }
 
-/// `ClaudeCompanion hook <stop|notification|prompt|tool> --account <id>`
+/// `ClaudeCompanion hook <stop|notification|prompt|tool-start|tool> --account <id>`
 /// Claude Code pipes the hook JSON on stdin. We must be quick and always exit 0.
 enum HookCLI {
     static func run(_ args: [String]) {
@@ -41,9 +43,11 @@ enum HookCLI {
 
         // "prompt": you sent a message. "tool": Claude finished an action, so it's working again
         // (e.g. right after you approved a permission or answered a question).
-        if kind == "prompt" || kind == "tool" {
+        var activity: String?
+        if kind == "prompt" || kind == "tool" || kind == "tool-start" {
             event = .started
             body = ""
+            if kind == "tool-start" { activity = describe(json["tool_name"] as? String, json["tool_input"] as? [String: Any]) }
         } else if kind == "notification" {
             let message = json["message"] as? String ?? "Claude needs your attention"
             let type = json["notification_type"] as? String ?? ""
@@ -57,11 +61,11 @@ enum HookCLI {
             event = .finished
             body = (json["transcript_path"] as? String).flatMap(lastAssistantText) ?? "Done."
         }
-        if body.count > 180 { body = String(body.prefix(177)) + "…" }
+        if body.count > 600 { body = String(body.prefix(597)) + "…" }
 
         let msg = HookMessage(accountID: accountID, event: event, project: project,
                               body: body, sessionID: json["session_id"] as? String,
-                              appBundleID: hostAppBundleID(), cwd: cwd, tty: controllingTTY())
+                              appBundleID: hostAppBundleID(), cwd: cwd, tty: controllingTTY(), activity: activity)
 
         // CLAUDE_COMPANION_DEBUG=1: print what would be sent, for troubleshooting.
         if ProcessInfo.processInfo.environment["CLAUDE_COMPANION_DEBUG"] != nil,
@@ -82,6 +86,31 @@ enum HookCLI {
     }
 
     /// Walks up the process tree to the first regular app (Terminal, iTerm, VS Code, Cursor…).
+    /// A short, human description of a tool call: "Editing parser.swift", "Running npm test"…
+    static func describe(_ tool: String?, _ input: [String: Any]?) -> String? {
+        guard let tool else { return nil }
+        func file() -> String? {
+            ((input?["file_path"] ?? input?["notebook_path"] ?? input?["path"]) as? String).map { ($0 as NSString).lastPathComponent }
+        }
+        func short(_ s: String, _ n: Int = 48) -> String {
+            let one = s.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+            return one.count > n ? String(one.prefix(n - 1)) + "…" : one
+        }
+        switch tool {
+        case "Edit", "MultiEdit", "NotebookEdit": return "Editing \(file() ?? "a file")"
+        case "Write": return "Writing \(file() ?? "a file")"
+        case "Read": return "Reading \(file() ?? "a file")"
+        case "Bash": return (input?["command"] as? String).map { "Running " + short($0) } ?? "Running a command"
+        case "Grep", "Glob", "LS": return "Searching the code"
+        case "WebFetch", "WebSearch": return "Browsing the web"
+        case "Task", "Agent": return "Asking a helper agent"
+        case "TodoWrite": return "Planning the next steps"
+        default:
+            if tool.hasPrefix("mcp__") { return "Using " + (tool.split(separator: "__").dropFirst().first.map(String.init) ?? "a tool") }
+            return "Using \(tool)"
+        }
+    }
+
     /// The process that ran the hook. The shim passes it along, because by the time this
     /// background process looks, the shim itself may already have exited.
     static var hookParentPID: pid_t {

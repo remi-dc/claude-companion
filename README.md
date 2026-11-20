@@ -46,6 +46,14 @@ Flick is a small ember who lives in your menu bar and shows what Claude is doing
 
 He flickers while Claude works, hops when a session needs your OK, cheers when it's done and naps when things are quiet. Pick his color (Ember, Glacier, Mint or your account's color) and size, turn his friendly messages off, or keep him still in calm mode.
 
+## Lives in your notch, if you like
+
+<p align="center">
+  <img src="docs/images/notch.png" width="620" alt="The notch: working with live activity, a permission request with an Open button, and the expanded notch with sessions, account switching and the 5-hour window">
+</p>
+
+Pick **Menu bar**, **Notch** or **Both** in Settings › Notch. The notch grows out of your MacBook's notch (a small pill on other screens): it shows what Claude is doing right now, drops down when a session needs you or is done (with the sound, and a button to jump to it) instead of sending macOS notifications, and opens on hover with five tabs: **Claude**, **Music** (Music and Spotify), **Calendar** (next meeting, join the call), **Shelf** (drop files on the notch) and **Clipboard**. Private things hide while your display is mirrored.
+
 ## What it does
 
 <table>

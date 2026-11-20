@@ -82,8 +82,59 @@ enum Demo {
                      body: "Fixed the broken links.", sessionID: "backup-1")]
     }
 
+    /// `demo-shots <dir> light notch:<phase>`: the notch in one state, on made-up content.
+    @MainActor
+    static func runNotch(_ state: AppState, phase: String) {
+        let notch = NotchController.shared
+        state.config.notch.presentation = "both"
+        if !phase.hasPrefix("working") {
+            for k in state.sessions.keys where state.sessions[k]?.mood == .working { state.sessions[k]?.mood = .done }
+        }
+        if phase != "needs" && !phase.hasPrefix("expanded") {
+            for k in state.sessions.keys where state.sessions[k]?.mood == .needs { state.sessions[k]?.mood = .done }
+        }
+        if phase.hasPrefix("working") { state.sessions["personal-today"]?.activity = "Editing HeroSection.swift" }
+        notch.apply(state)
+        notch.music.demoTrack = .init(app: "Spotify", title: "[Track title]", artist: "[Artist]", artworkURL: nil, isPlaying: true)
+        notch.calendar.demo = true
+        notch.calendar.access = .fullAccess
+        let now = Date()
+        notch.calendar.events = [
+            .init(id: "1", title: "Design review", start: now.addingTimeInterval(12 * 60), end: now.addingTimeInterval(42 * 60),
+                  joinURL: URL(string: "https://meet.google.com/demo")),
+            .init(id: "2", title: "1:1 with Sam", start: now.addingTimeInterval(3 * 3600), end: now.addingTimeInterval(3.5 * 3600), joinURL: nil),
+        ]
+        notch.shelf.items = ["report.pdf", "screenshot.png", "notes.md"].map { URL(fileURLWithPath: "/System/Library/CoreServices/\($0)") }
+        notch.clipboard.clips = ["git checkout -b fix/login", "https://github.com/acme/app/pull/42", "#D9653B", "Ship it after the review"]
+            .enumerated().map { .init(text: $1, date: now.addingTimeInterval(-Double($0 * 400 + 60))) }
+        switch phase {
+        case "needs":
+            notch.model.show(NotchAlert(id: "work-today", title: "Work needs a hand", subtitle: "Work · billing-api",
+                                        body: "Claude needs your permission to use Bash", mood: .needs,
+                                        location: state.sessions["work-today"]?.location, stays: true))
+        case "done":
+            notch.model.show(NotchAlert(id: "done", title: "notes-app is ready", subtitle: "Personal · notes-app",
+                                        body: "Added offline sync, updated the tests and the README.", mood: .done,
+                                        location: state.sessions["personal-3"]?.location, copyText: "…", stays: true))
+        default:
+            if phase.hasPrefix("expanded") {
+                notch.model.tab = NotchTab(rawValue: String(phase.dropFirst("expanded-".count))) ?? .claude
+                notch.model.expanded = true
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            guard let dir = outDir, let n = notch.windowNumber else { return }
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            try? "Notch\t\(n)".write(toFile: dir + "/windows.txt", atomically: true, encoding: .utf8)
+        }
+    }
+
     @MainActor
     static func run(_ state: AppState) {
+        if let pane = settingsPane, pane.hasPrefix("notch:") {
+            runNotch(state, phase: String(pane.dropFirst("notch:".count)))
+            return
+        }
         NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             for id in settingsPane == nil ? ["popover", "sessions", "dashboard"] : ["settings"] {

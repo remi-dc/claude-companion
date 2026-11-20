@@ -15,8 +15,8 @@ enum AlertsEngine {
         var fired = Set(UserDefaults.standard.stringArray(forKey: firedKey) ?? [])
         let before = fired
         for alert in compute(config: state.config, usage: state.usage, now: now, fired: &fired) {
-            state.notifier.postAlert(title: alert.title, body: alert.body, mood: alert.mood, palette: state.flickPalette,
-                                     account: alert.accountID.flatMap { state.config.account($0) })
+            state.presentAlert(id: alert.key, title: alert.title, body: alert.body, mood: alert.mood,
+                               account: alert.accountID.flatMap { state.config.account($0) })
         }
         if fired != before {
             UserDefaults.standard.set(Array(fired).sorted().suffix(300), forKey: firedKey)

@@ -9,12 +9,13 @@ struct SettingsView: View {
     @State private var pane: Pane = Demo.settingsPane.flatMap(Pane.init(rawValue:)) ?? .general
 
     enum Pane: String, CaseIterable, Identifiable {
-        case general, accounts, switching, notifications, alerts, shortcuts, setup, about
+        case general, notch, accounts, switching, notifications, alerts, shortcuts, setup, about
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .general: return "General"
+            case .notch: return "Notch"
             case .accounts: return "Accounts"
             case .switching: return "Switching"
             case .notifications: return "Notifications"
@@ -28,6 +29,7 @@ struct SettingsView: View {
         var icon: (symbol: String, color: Color) {
             switch self {
             case .general: return ("flame.fill", Color(hex: 0xE2774D))
+            case .notch: return ("rectangle.topthird.inset.filled", Color(hex: 0x1D1D1F))
             case .accounts: return ("person.2.fill", Color(hex: 0x2A78D6))
             case .switching: return ("arrow.triangle.branch", Color(hex: 0x6250D6))
             case .notifications: return ("bell.badge.fill", Color(hex: 0xE34948))
@@ -63,6 +65,7 @@ struct SettingsView: View {
             Group {
                 switch pane {
                 case .general: GeneralPane()
+                case .notch: NotchPane()
                 case .accounts: AccountsPane()
                 case .switching: SwitchingPane()
                 case .notifications: NotificationsPane()
@@ -759,5 +762,55 @@ private struct AboutPane: View {
         if case .failed(let message) = updater.phase { return message }
         if let r = updater.available { return "Version \(r.version) is available" }
         return updater.lastChecked == nil ? "Checks every few hours" : "You're up to date"
+    }
+}
+
+// MARK: Notch
+
+private struct NotchPane: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Show Claude Companion in", selection: $state.config.notch.presentation) {
+                    Text("Menu bar").tag("menubar")
+                    Text("Notch").tag("notch")
+                    Text("Both").tag("both")
+                }
+                .pickerStyle(.segmented)
+            } footer: {
+                Text("The notch grows out of your MacBook's notch: Flick sits beside it, it widens while Claude works, drops down when a session needs you, and opens with your tools when you hover it. On screens without a notch it's a small pill at the top center.")
+            }
+
+            if state.config.notch.notchOn {
+                Section("Behavior") {
+                    Toggle(isOn: $state.config.notch.notificationsInNotch) {
+                        RowLabel(title: "Show notifications in the notch", detail: "Instead of macOS banners. Sounds still play, and each one has a button to jump to the session.")
+                    }
+                    Toggle(isOn: $state.config.notch.liveActivity) {
+                        RowLabel(title: "Show what Claude is doing", detail: "“Editing parser.swift”, “Running npm test”… under the notch while it works.")
+                    }
+                    Picker("Screen", selection: $state.config.notch.screen) {
+                        Text("Built-in display").tag("builtin")
+                        Text("The one with the pointer").tag("pointer")
+                    }
+                    Toggle(isOn: $state.config.notch.privateWhenMirroring) {
+                        RowLabel(title: "Hide private things while mirroring", detail: "Projects, messages, clipboard and shelf stay hidden when your display is mirrored, e.g. on a projector.")
+                    }
+                }
+
+                Section {
+                    Toggle(isOn: $state.config.notch.musicTab) { Label("Music", systemImage: "music.note") }
+                    Toggle(isOn: $state.config.notch.calendarTab) { Label("Calendar", systemImage: "calendar") }
+                    Toggle(isOn: $state.config.notch.shelfTab) { Label("Shelf", systemImage: "tray.full") }
+                    Toggle(isOn: $state.config.notch.clipboardTab) { Label("Clipboard", systemImage: "doc.on.clipboard") }
+                } header: {
+                    Text("Tabs")
+                } footer: {
+                    Text("Music works with Music and Spotify (macOS asks once to let Claude Companion control them). Calendar asks for access the first time. The clipboard history stays in memory and skips anything apps mark as a password.")
+                }
+            }
+        }
     }
 }

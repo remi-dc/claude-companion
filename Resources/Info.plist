@@ -23,7 +23,9 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Claude Companion uses this to bring the exact Terminal or iTerm tab of a Claude session to the front when you click a notification.</string>
+	<string>Claude Companion uses this to bring the exact Terminal or iTerm tab of a Claude session to the front, and to show and control what's playing in Music or Spotify from the notch.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Claude Companion shows your next meeting in the notch, with a button to join the call.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

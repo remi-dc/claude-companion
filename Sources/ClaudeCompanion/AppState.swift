@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
             Integration.writeActiveFile(activeAccount)
             Integration.writeWrapperData(config)
             if config.shortcuts != oldValue.shortcuts { registerShortcuts() }
+            if config.notch != oldValue.notch { NotchController.shared.apply(self) }
         }
     }
     /// Shortcuts another app already uses (couldn't be registered).
@@ -76,6 +77,7 @@ final class AppState: ObservableObject {
         refreshPermission()
         updater.start()
         registerShortcuts()
+        DispatchQueue.main.async { NotchController.shared.apply(self) }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshUsage(); self?.refreshPermission(); self?.now = Date() }
         }
@@ -124,10 +126,10 @@ final class AppState: ObservableObject {
             guard index < config.accounts.count else { return }
             let account = config.accounts[index]
             withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) { activate(account.id) }
-            notifier.postAlert(title: config.friendlyMessages ? "Switched to \(account.name)" : "Active account: \(account.name)",
-                               body: "New Claude sessions use this account.", mood: .done, palette: flickPalette, sound: nil)
+            presentAlert(id: "switch", title: config.friendlyMessages ? "Switched to \(account.name)" : "Active account: \(account.name)",
+                         body: "New Claude sessions use this account.", mood: .done, account: account, sound: nil)
         case "popover":
-            HotKeys.togglePopover()
+            if config.notch.menuBarOn { HotKeys.togglePopover() } else { NotchController.shared.toggleExpanded() }
         case "sessions":
             WindowManager.shared.show("sessions", state: self)
         default:
@@ -183,10 +185,37 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Notifications go to the notch (when it's on and set to) instead of macOS banners.
+    var notchShowsNotifications: Bool {
+        config.notch.notchOn && config.notch.notificationsInNotch && NotchController.shared.isOn
+    }
+
+    /// One place for usage alerts and confirmations: the notch, or a macOS notification.
+    func presentAlert(id: String = UUID().uuidString, title: String, body: String, mood: FlickMood,
+                      account: Account? = nil, sound: String? = "Tink") {
+        if notchShowsNotifications {
+            if let sound { Sounds.play(sound) }
+            NotchController.shared.model.show(NotchAlert(id: id, title: title, subtitle: account?.name ?? "Claude Companion",
+                                                         body: body, mood: mood))
+        } else {
+            notifier.postAlert(title: title, body: body, mood: mood, palette: flickPalette, account: account, sound: sound)
+        }
+    }
+
     /// Editors can't ask before a session starts, so show which account it's on, with a way to switch.
     private func remindAccount(for msg: HookMessage, key: String) {
         guard let account = config.account(msg.accountID) else { return }
         let others = config.accounts.filter { $0.id != account.id }
+        if notchShowsNotifications {
+            NotchController.shared.model.show(NotchAlert(
+                id: "reminder-" + key, title: "This session is on \(account.name)",
+                subtitle: account.loggedInEmail ?? msg.project,
+                body: (config.friendlyMessages ? "Welcome back! " : "") + "Wrong account? Switch for your next conversation.",
+                mood: .idle,
+                actions: others.map { other in (other.name, { [weak self] in self?.activate(other.id) }) },
+                stays: true))
+            return
+        }
         StickyNotes.shared.show(StickyNotes.Note(
             id: "reminder-" + key,
             title: "This session is on \(account.name)",
@@ -244,6 +273,8 @@ final class AppState: ObservableObject {
                                             cwd: msg.cwd ?? sessions[key]?.location.cwd,
                                             tty: msg.tty ?? sessions[key]?.location.tty,
                                             sessionID: msg.sessionID))
+            if mood == .working { sessions[key]?.activity = msg.activity ?? (msg.event == .started && previous?.mood == .working ? previous?.activity : nil) }
+            if msg.event == .finished { sessions[key]?.lastReply = msg.body }
         }
         if sessions.count > 50 {
             for k in sessions.sorted(by: { $0.value.date < $1.value.date }).prefix(sessions.count - 50).map(\.key) {
@@ -252,13 +283,26 @@ final class AppState: ObservableObject {
         }
         // Anything new from this session resolves its sticky card (e.g. you approved the permission).
         StickyNotes.shared.dismiss(key)
+        if msg.event == .started { NotchController.shared.model.dismiss(key) }
         guard msg.event != .started else { return }
 
         recent.insert(msg, at: 0)
         if recent.count > 30 { recent.removeLast(recent.count - 30) }
         let account = config.account(msg.accountID)
         guard !config.paused, account?.notificationsEnabled != false else { return }
-        if config.isSticky(msg.event) {
+        if notchShowsNotifications {
+            if let account { Sounds.play(account.sound(for: msg.event)) }
+            let mood: FlickMood = msg.event == .permission ? .needs : .done
+            NotchController.shared.model.show(NotchAlert(
+                id: key,
+                title: msg.event == .permission ? "\(account?.name ?? "Claude") needs a hand"
+                     : msg.event == .finished ? "\(msg.project) is ready" : "Waiting for you · \(msg.project)",
+                subtitle: "\(account?.name ?? msg.accountID) · \(msg.project)",
+                body: config.showMessagePreview ? msg.body : nil,
+                mood: mood, location: msg.location,
+                copyText: msg.event == .finished ? msg.body : nil,
+                stays: msg.event == .permission))
+        } else if config.isSticky(msg.event) {
             if let account { Sounds.play(account.sound(for: msg.event)) }
             StickyNotes.shared.show(StickyNotes.Note(
                 id: key, title: "\(msg.event.title) · \(msg.project)", subtitle: account?.name ?? msg.accountID,
@@ -363,4 +407,8 @@ struct SessionStatus: Identifiable, Hashable {
     var startedAt: Date
     var appBundleID: String?
     var location: SessionLocation
+    /// What Claude is doing right now (live activity), while working.
+    var activity: String? = nil
+    /// Claude's last reply, for the "done" preview.
+    var lastReply: String? = nil
 }

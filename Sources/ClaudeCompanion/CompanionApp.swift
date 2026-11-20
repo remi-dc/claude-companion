@@ -4,7 +4,7 @@ struct CompanionApp: App {
     @StateObject private var state = AppState()
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: Binding(get: { state.config.notch.menuBarOn || Demo.isOn }, set: { _ in })) {
             MenuBarView()
                 .environmentObject(state)
                 .environmentObject(state.updater)
