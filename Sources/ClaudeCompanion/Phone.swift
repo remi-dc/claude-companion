@@ -25,22 +25,38 @@ enum Phone {
         case .waiting: guard s.waiting else { return }
         case .alert: guard s.alerts else { return }
         }
-        if s.onlyWhenAway, !screenLocked, idleSeconds < Double(s.awayMinutes) * 60 { return }
+        let locked = screenLocked, idle = idleSeconds
+        if s.onlyWhenAway, !locked, idle < Double(s.awayMinutes) * 60 {
+            record("Skipped “\(title)”: you were at the Mac (idle \(Int(idle)) s, screen unlocked)")
+            return
+        }
         send(title: title, body: (s.includeText ? body : nil) ?? "Open your Mac to see it.",
-             priority: kind == .permission ? 4 : 3, tags: kind == .permission ? "raised_hand" : "fire", settings: s)
+             priority: kind == .permission ? 4 : 3, tags: kind == .permission ? "raised_hand" : "fire", settings: s) { ok in
+            record(ok ? "Sent “\(title)” (\(locked ? "screen locked" : "idle \(Int(idle)) s"))" : "Couldn't send “\(title)”: the server didn't answer")
+        }
     }
 
-    /// One POST to the topic. ntfy headers: Title, Priority (1–5), Tags (emoji shortcodes).
+    /// The last decision, shown in Settings › Phone so you can see why something was or wasn't sent.
+    static func record(_ text: String) {
+        let line = "\(Date().formatted(date: .omitted, time: .standard)) · \(text)"
+        UserDefaults.standard.set(line, forKey: "phoneLastStatus")
+        NSLog("Claude Companion phone: %@", text)
+    }
+
+    static var lastStatus: String? { UserDefaults.standard.string(forKey: "phoneLastStatus") }
+
+    /// One JSON publish to the server (JSON keeps accents and "·" intact; HTTP headers don't).
     @discardableResult
     static func send(title: String, body: String, priority: Int = 3, tags: String = "fire", settings s: PhoneSettings,
                      completion: ((Bool) -> Void)? = nil) -> Bool {
-        guard let url = s.topicURL, url.scheme == "https" || url.scheme == "http" else { completion?(false); return false }
+        let server = s.server.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        guard let url = URL(string: server), url.scheme == "https" || url.scheme == "http" else { completion?(false); return false }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
-        req.setValue(String(title.prefix(200)), forHTTPHeaderField: "Title")
-        req.setValue("\(priority)", forHTTPHeaderField: "Priority")
-        req.setValue(tags, forHTTPHeaderField: "Tags")
-        req.httpBody = Data(String(body.prefix(1000)).utf8)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = ["topic": s.topic, "title": String(title.prefix(200)),
+                                      "message": String(body.prefix(1000)), "priority": priority, "tags": [tags]]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         URLSession.shared.dataTask(with: req) { _, response, error in
             let ok = error == nil && ((response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false)
             DispatchQueue.main.async { completion?(ok) }

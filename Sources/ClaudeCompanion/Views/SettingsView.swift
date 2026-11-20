@@ -879,6 +879,12 @@ private struct PhonePane: View {
                     Text("The topic works like a password: anyone who knows it can read the messages. Keep it to yourself, or make a new one below.")
                 }
 
+                if let last = Phone.lastStatus {
+                    Section("Last notification") {
+                        Text(last).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                }
+
                 Section("When") {
                     Toggle(isOn: $state.config.phone.onlyWhenAway) {
                         RowLabel(title: "Only when I'm away from the Mac", detail: "When the screen is locked, or nothing was typed or clicked for a while.")
