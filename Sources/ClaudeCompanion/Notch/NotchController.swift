@@ -69,7 +69,7 @@ struct NotchLayout: Equatable {
             case .claude: body = 196
             case .music: body = 150
             case .calendar: body = 176
-            case .shelf: body = 196
+            case .shelf: body = 214
             case .clipboard: body = 236
             }
             return NotchLayout(kind: .expanded, width: max(base + 300, 700), height: g.height + body, radius: 28)

@@ -234,10 +234,14 @@ private struct ExpandedContent: View {
                 case .clipboard: ClipboardTab()
                 }
             }
+            // Anchored to the top: if a tab ever needs more room it's cut at the bottom,
+            // never pushed up under the hardware notch.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .padding(.horizontal, 22)
-        .padding(.bottom, 18)
+        .padding(.bottom, 14)
         .onAppear { if !tabs.contains(model.tab) { model.tab = .claude }; syncTools() }
         .onChange(of: model.tab) { syncTools() }
         .onDisappear { music.setVisible(false) }
@@ -570,11 +574,11 @@ private struct ShelfTab: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(shelf.items, id: \.self) { url in
-                            VStack(spacing: 6) {
-                                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 56, height: 56)
+                            VStack(spacing: 4) {
+                                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 44, height: 44)
                                 Text(url.lastPathComponent).font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.center)
                             }
-                            .frame(width: 96, height: 120)
+                            .frame(width: 88, height: 92)
                             .padding(6)
                             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.07)))
                             .overlay(alignment: .topTrailing) {
