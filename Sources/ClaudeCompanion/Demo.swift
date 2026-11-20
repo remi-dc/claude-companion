@@ -119,7 +119,7 @@ enum Demo {
         case "needs", "needs-folded":
             notch.model.show(NotchAlert(id: "work-today", title: "Work needs a hand", subtitle: "Work · billing-api",
                                         body: "Claude needs your permission to use Bash", mood: .needs,
-                                        location: state.sessions["work-today"]?.location, stays: true))
+                                        location: state.sessions["work-today"]?.location, accountID: "work", stays: true))
         case "done":
             notch.model.show(NotchAlert(id: "done", title: "notes-app is ready", subtitle: "Personal · notes-app",
                                         body: "Added offline sync, updated the tests and the README.", mood: .done,

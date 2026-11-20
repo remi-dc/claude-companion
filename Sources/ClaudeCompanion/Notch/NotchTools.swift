@@ -45,6 +45,14 @@ final class MusicController: ObservableObject {
         track = [spotify, music].compactMap { $0 }.first(where: \.isPlaying) ?? spotify ?? music
     }
 
+    /// Brings the player (Spotify or Music) to the front.
+    func openPlayer() {
+        guard let app = track?.app else { return }
+        let id = app == "Spotify" ? "com.spotify.client" : "com.apple.Music"
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     func command(_ verb: String) {
         guard let app = track?.app else { return }
         run("tell application \"\(app)\" to \(verb)")
@@ -121,7 +129,7 @@ final class CalendarProvider: ObservableObject {
         events = store.events(matching: predicate)
             .filter { !$0.isAllDay && $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
-            .prefix(4)
+            .prefix(12)
             .map { Event(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "Event",
                          start: $0.startDate, end: $0.endDate, joinURL: Self.joinLink($0)) }
     }

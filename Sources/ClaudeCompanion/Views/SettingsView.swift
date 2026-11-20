@@ -190,8 +190,12 @@ private struct GeneralPane: View {
             }
 
             Section("Menu bar") {
-                Toggle(isOn: $state.config.showAccountInMenuBar) {
-                    RowLabel(title: "Show the active account's color", detail: "A small dot on the menu bar icon: blue, orange, green…")
+                Picker(selection: $state.config.menuBarAccount) {
+                    Text("Name").tag("name")
+                    Text("Color dot").tag("dot")
+                    Text("Nothing").tag("off")
+                } label: {
+                    RowLabel(title: "Show the active account", detail: "Its name (like “School”) next to the icon, or a dot in its color.")
                 }
             }
         }

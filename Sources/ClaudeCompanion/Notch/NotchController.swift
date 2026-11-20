@@ -11,6 +11,8 @@ struct NotchAlert: Identifiable {
     var location: SessionLocation? = nil
     var actions: [(String, () -> Void)] = []
     var copyText: String? = nil
+    /// The account it's about, shown by name in the folded notch.
+    var accountID: String? = nil
     /// Stays until resolved (permission requests); otherwise folds back after a few seconds.
     var stays = false
 }
@@ -81,7 +83,7 @@ struct NotchLayout: Equatable {
         if state.liveSessions.contains(where: { $0.mood == .working }) {
             return NotchLayout(kind: .working, width: base + 330, height: compactHeight, radius: 12)
         }
-        return NotchLayout(kind: .idle, width: base + (g.hasNotch ? 92 : 40), height: g.hasNotch ? g.height : g.height - 4, radius: g.hasNotch ? 10 : 12)
+        return NotchLayout(kind: .idle, width: base + (g.hasNotch ? 150 : 110), height: g.hasNotch ? g.height : g.height - 4, radius: g.hasNotch ? 10 : 12)
     }
 }
 

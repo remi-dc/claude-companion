@@ -108,6 +108,8 @@ struct CompanionConfig: Codable {
     var reminderHours = 4
     /// A dot in the active account's color on the menu bar icon.
     var showAccountInMenuBar = true
+    /// How the menu bar shows the active account: "name" (e.g. "School"), "dot" (its color) or "off".
+    var menuBarAccount = "name"
     var notch = NotchSettings()
 
     /// The account a folder rule assigns to `path`, if any.
@@ -142,6 +144,7 @@ struct CompanionConfig: Codable {
         folderRules = (try? c.decodeIfPresent([FolderRule].self, forKey: .folderRules)) ?? []
         reminderHours = (try? c.decodeIfPresent(Int.self, forKey: .reminderHours)) ?? 4
         showAccountInMenuBar = (try? c.decodeIfPresent(Bool.self, forKey: .showAccountInMenuBar)) ?? true
+        menuBarAccount = (try? c.decodeIfPresent(String.self, forKey: .menuBarAccount)) ?? (showAccountInMenuBar ? "name" : "off")
         notch = (try? c.decodeIfPresent(NotchSettings.self, forKey: .notch)) ?? NotchSettings()
     }
 

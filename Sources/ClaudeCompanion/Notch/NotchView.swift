@@ -58,9 +58,8 @@ private struct IdleContent: View {
             FlickView(mood: state.mood == .needs ? .needs : (state.mood == .sleep ? .sleep : .idle), size: 20, animated: false)
                 .padding(.leading, 10)
             Spacer(minLength: 0)
-            Circle().fill(state.config.color(for: state.activeAccount.id)).frame(width: 8, height: 8)
-                .padding(.trailing, 13)
-                .help(state.activeAccount.name)
+            AccountTag(accountID: state.activeAccount.id)
+                .padding(.trailing, 10)
         }
         .frame(height: model.geometry.hasNotch ? model.geometry.height : model.geometry.height - 4)
     }
@@ -88,7 +87,7 @@ private struct WorkingContent: View {
             if let s = session {
                 Text(s.startedAt, style: .timer).font(.number(12, weight: .semibold)).monospacedDigit()
             }
-            Circle().fill(state.config.color(for: session?.accountID ?? state.activeAccount.id)).frame(width: 8, height: 8)
+            AccountTag(accountID: session?.accountID ?? state.activeAccount.id)
         }
         .padding(.horizontal, 12)
         .frame(height: model.geometry.hasNotch ? model.geometry.height : model.geometry.height - 4)
@@ -113,7 +112,7 @@ private struct CompactAlertContent: View {
                     Button("Open") { Navigator.go(to: location); model.dismiss(alert.id) }
                         .buttonStyle(NotchPill(prominent: true, compact: true))
                 }
-                Circle().fill(Color(hex: 0xEB6834)).frame(width: 8, height: 8)
+                AccountTag(accountID: alert.accountID ?? state.activeAccount.id)
             }
             .padding(.horizontal, 12)
             .frame(height: model.geometry.hasNotch ? model.geometry.height : model.geometry.height - 4)
@@ -406,10 +405,16 @@ private struct MusicTab: View {
                 .frame(width: 104, height: 104)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+                .onTapGesture { music.openPlayer() }
+                .help("Open in \(t.app)")
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(t.title).font(.system(size: 17, weight: .semibold)).lineLimit(1)
-                    Text(t.artist).font(.system(size: 13)).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
+                    Group {
+                        Text(t.title).font(.system(size: 17, weight: .semibold)).lineLimit(1)
+                        Text(t.artist).font(.system(size: 13)).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
+                    }
+                    .onTapGesture { music.openPlayer() }
+                    .help("Open in \(t.app)")
                     if t.duration > 0 { TimelineView(.periodic(from: .now, by: 1)) { ctx in
                         let pos = t.currentPosition(at: ctx.date)
                         VStack(spacing: 4) {
@@ -493,32 +498,34 @@ private struct CalendarTab: View {
         let cal = Calendar.current
         let today = calendar.events.filter { cal.isDateInToday($0.start) || $0.start < Date() }
         let later = calendar.events.filter { !(cal.isDateInToday($0.start) || $0.start < Date()) }
-        VStack(alignment: .leading, spacing: 6) {
-            if today.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x1BAF7A))
-                    Text("Nothing else today").font(.system(size: 14, weight: .semibold))
-                }
-                .padding(.bottom, 2)
-            }
-            ForEach(Array((today + later).prefix(3).enumerated()), id: \.element.id) { i, e in
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 2).fill(i == 0 && !today.isEmpty ? Ember.ring : Color.white.opacity(0.3))
-                        .frame(width: 3, height: 32)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(e.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                        Text(when(e)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 6) {
+                if today.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x1BAF7A))
+                        Text("Nothing else today").font(.system(size: 14, weight: .semibold))
                     }
-                    Spacer(minLength: 6)
-                    if let url = e.joinURL {
-                        Button("Join") { NSWorkspace.shared.open(url) }.buttonStyle(NotchPill(prominent: i == 0 && !today.isEmpty))
-                    }
+                    .padding(.bottom, 2)
                 }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(i == 0 ? 0.09 : 0.05)))
-            }
-            if calendar.events.isEmpty {
-                Text("Nothing in the next 7 days either.").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                ForEach(Array((today + later).enumerated()), id: \.element.id) { i, e in
+                    HStack(spacing: 10) {
+                        RoundedRectangle(cornerRadius: 2).fill(i == 0 && !today.isEmpty ? Ember.ring : Color.white.opacity(0.3))
+                            .frame(width: 3, height: 32)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(e.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                            Text(when(e)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                        }
+                        Spacer(minLength: 6)
+                        if let url = e.joinURL {
+                            Button("Join") { NSWorkspace.shared.open(url) }.buttonStyle(NotchPill(prominent: i == 0 && !today.isEmpty))
+                        }
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(i == 0 ? 0.09 : 0.05)))
+                }
+                if calendar.events.isEmpty {
+                    Text("Nothing in the next 7 days either.").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                }
             }
         }
     }
@@ -631,6 +638,22 @@ private struct ClipboardTab: View {
 }
 
 // MARK: Pieces
+
+/// The account written out ("Personal", "School") in its color: easier to read than a dot.
+private struct AccountTag: View {
+    @EnvironmentObject var state: AppState
+    let accountID: String
+    var body: some View {
+        let color = state.config.color(for: accountID)
+        Text(state.config.account(accountID)?.name ?? accountID)
+            .font(.system(size: 11, weight: .semibold))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(Capsule().fill(color.opacity(0.55)))
+            .fixedSize()
+    }
+}
 
 private struct EmptyNotchState: View {
     let symbol: String

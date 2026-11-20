@@ -10,10 +10,14 @@ struct CompanionApp: App {
                 .environmentObject(state.updater)
         } label: {
             let needs = state.liveSessions.first { $0.mood == .needs }
-            Image(nsImage: MenuBarIcon.image(
-                mood: state.mood, paused: state.config.paused, frame: state.iconFrame,
-                badge: needs.map { NSColor(state.config.color(for: $0.accountID)) },
-                accountDot: state.config.showAccountInMenuBar ? NSColor(state.config.color(for: state.activeAccount.id)) : nil))
+            let style = state.config.menuBarAccount
+            HStack(spacing: 4) {
+                Image(nsImage: MenuBarIcon.image(
+                    mood: state.mood, paused: state.config.paused, frame: state.iconFrame,
+                    badge: needs.map { NSColor(state.config.color(for: $0.accountID)) },
+                    accountDot: style == "dot" ? NSColor(state.config.color(for: state.activeAccount.id)) : nil))
+                if style == "name" { Text(state.activeAccount.name) }
+            }
         }
         .menuBarExtraStyle(.window)
     }

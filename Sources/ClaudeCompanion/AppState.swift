@@ -196,7 +196,7 @@ final class AppState: ObservableObject {
         if notchShowsNotifications {
             if let sound { Sounds.play(sound) }
             NotchController.shared.model.show(NotchAlert(id: id, title: title, subtitle: account?.name ?? "Claude Companion",
-                                                         body: body, mood: mood))
+                                                         body: body, mood: mood, accountID: account?.id))
         } else {
             notifier.postAlert(title: title, body: body, mood: mood, palette: flickPalette, account: account, sound: sound)
         }
@@ -213,6 +213,7 @@ final class AppState: ObservableObject {
                 body: (config.friendlyMessages ? "Welcome back! " : "") + "Wrong account? Switch for your next conversation.",
                 mood: .idle,
                 actions: others.map { other in (other.name, { [weak self] in self?.activate(other.id) }) },
+                accountID: account.id,
                 stays: true))
             return
         }
@@ -301,6 +302,7 @@ final class AppState: ObservableObject {
                 body: config.showMessagePreview ? msg.body : nil,
                 mood: mood, location: msg.location,
                 copyText: msg.event == .finished ? msg.body : nil,
+                accountID: msg.accountID,
                 stays: msg.event == .permission))
         } else if config.isSticky(msg.event) {
             if let account { Sounds.play(account.sound(for: msg.event)) }
