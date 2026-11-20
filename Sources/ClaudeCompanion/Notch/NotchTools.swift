@@ -12,6 +12,14 @@ final class MusicController: ObservableObject {
         var artist: String
         var artworkURL: URL?
         var isPlaying: Bool
+        var position: Double = 0      // seconds, when fetched
+        var duration: Double = 0      // seconds
+        var fetchedAt = Date()
+
+        /// Position now, moving forward while playing between polls.
+        func currentPosition(at date: Date) -> Double {
+            min(duration, position + (isPlaying ? date.timeIntervalSince(fetchedAt) : 0))
+        }
     }
 
     @Published private(set) var track: Track?
@@ -48,19 +56,23 @@ final class MusicController: ObservableObject {
     }
 
     private func query(_ app: String, artwork: Bool) -> Track? {
-        let art = artwork ? " & linefeed & (artwork url of current track)" : ""
+        // Spotify reports the duration in milliseconds, Music in seconds.
+        let art = artwork ? "(artwork url of current track)" : "\"\""
         let script = """
         tell application "\(app)"
             if player state is stopped then return ""
-            return (player state as string) & linefeed & (name of current track) & linefeed & (artist of current track)\(art)
+            return (player state as string) & linefeed & (name of current track) & linefeed & (artist of current track) & linefeed & \(art) & linefeed & (player position as string) & linefeed & (duration of current track as string)
         end tell
         """
         guard let out = run(script), !out.isEmpty else { return nil }
         let parts = out.components(separatedBy: "\n")
         guard parts.count >= 3 else { return nil }
+        func num(_ i: Int) -> Double { parts.count > i ? Double(parts[i].replacingOccurrences(of: ",", with: ".")) ?? 0 : 0 }
+        var duration = num(5)
+        if app == "Spotify" { duration /= 1000 }
         return Track(app: app, title: parts[1], artist: parts[2],
-                     artworkURL: parts.count > 3 ? URL(string: parts[3]) : nil,
-                     isPlaying: parts[0] == "playing")
+                     artworkURL: parts.count > 3 && !parts[3].isEmpty ? URL(string: parts[3]) : nil,
+                     isPlaying: parts[0] == "playing", position: num(4), duration: duration, fetchedAt: Date())
     }
 
     @discardableResult
@@ -105,11 +117,11 @@ final class CalendarProvider: ObservableObject {
         lastLoad = Date()
         let now = Date()
         let predicate = store.predicateForEvents(withStart: now.addingTimeInterval(-15 * 60),
-                                                 end: now.addingTimeInterval(24 * 3600), calendars: nil)
+                                                 end: now.addingTimeInterval(7 * 24 * 3600), calendars: nil)
         events = store.events(matching: predicate)
             .filter { !$0.isAllDay && $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
-            .prefix(2)
+            .prefix(4)
             .map { Event(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "Event",
                          start: $0.startDate, end: $0.endDate, joinURL: Self.joinLink($0)) }
     }

@@ -50,7 +50,7 @@ struct NotchGeometry: Equatable {
 
 /// Size and shape of the black island for the current state.
 struct NotchLayout: Equatable {
-    enum Kind: Equatable { case idle, working(activity: Bool), alert, expanded }
+    enum Kind: Equatable { case idle, working, alert, alertCompact, expanded }
     var kind: Kind
     var width: CGFloat
     var height: CGFloat
@@ -60,12 +60,26 @@ struct NotchLayout: Equatable {
     static func compute(_ model: NotchModel, _ state: AppState) -> NotchLayout {
         let g = model.geometry
         let base = g.notchWidth
-        if model.expanded { return NotchLayout(kind: .expanded, width: max(base + 300, 760), height: g.height + 292, radius: 30) }
-        if model.alert != nil { return NotchLayout(kind: .alert, width: max(base + 260, 560), height: g.height + 100, radius: 26) }
+        if model.expanded {
+            // Only as tall as the tab needs: no big black void.
+            let body: CGFloat
+            switch model.tab {
+            case .claude: body = 196
+            case .music: body = 150
+            case .calendar: body = 176
+            case .shelf: body = 196
+            case .clipboard: body = 236
+            }
+            return NotchLayout(kind: .expanded, width: max(base + 300, 700), height: g.height + body, radius: 28)
+        }
+        // Compact states never go below the menu bar, so they never cover your windows.
+        let compactHeight = g.hasNotch ? g.height : g.height - 4
+        if model.alert != nil {
+            if model.alertCollapsed { return NotchLayout(kind: .alertCompact, width: base + 330, height: compactHeight, radius: 12) }
+            return NotchLayout(kind: .alert, width: max(base + 260, 560), height: g.height + 100, radius: 26)
+        }
         if state.liveSessions.contains(where: { $0.mood == .working }) {
-            let activity = state.config.notch.liveActivity && state.focusSession?.activity != nil && !model.isPrivate
-            return NotchLayout(kind: .working(activity: activity), width: base + 270,
-                               height: g.height + (activity ? 24 : 0), radius: activity ? 16 : 12)
+            return NotchLayout(kind: .working, width: base + 330, height: compactHeight, radius: 12)
         }
         return NotchLayout(kind: .idle, width: base + (g.hasNotch ? 92 : 40), height: g.hasNotch ? g.height : g.height - 4, radius: g.hasNotch ? 10 : 12)
     }
@@ -76,6 +90,9 @@ final class NotchModel: ObservableObject {
     @Published var expanded = false
     @Published var tab: NotchTab = .claude
     @Published private(set) var alert: NotchAlert?
+    /// A lasting alert (permission) folds into the menu bar after a few seconds instead of covering your windows.
+    @Published private(set) var alertCollapsed = false
+    private var collapseTask: DispatchWorkItem?
     @Published var isPrivate = false
     @Published var geometry = NotchGeometry(hasNotch: false, notchWidth: 120, height: 24, screenFrame: .zero)
     private var queue: [NotchAlert] = []
@@ -106,9 +123,15 @@ final class NotchModel: ObservableObject {
 
     private func present(_ a: NotchAlert) {
         dismissTask?.cancel()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) { alert = a }
-        guard !a.stays else { return }
-        scheduleDismiss(a.id, after: 8)
+        collapseTask?.cancel()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) { alert = a; alertCollapsed = false }
+        guard a.stays else { scheduleDismiss(a.id, after: 8); return }
+        let task = DispatchWorkItem { [weak self] in
+            guard let self, self.alert?.id == a.id, !self.expanded else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { self.alertCollapsed = true }
+        }
+        collapseTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: task)
     }
 
     private func scheduleDismiss(_ id: String, after seconds: Double) {
@@ -167,7 +190,8 @@ final class NotchController {
             p.hasShadow = false
             p.hidesOnDeactivate = false
             p.ignoresMouseEvents = true
-            p.contentView = NSHostingView(rootView: NotchRootView()
+            p.becomesKeyOnlyIfNeeded = true
+            p.contentView = FirstClickHostingView(rootView: NotchRootView()
                 .modifier(FlickThemed())
                 .environmentObject(state).environmentObject(model).environmentObject(music)
                 .environmentObject(calendar).environmentObject(shelf).environmentObject(clipboard))
@@ -289,4 +313,10 @@ final class NotchController {
             closeTask = nil
         }
     }
+}
+
+/// The notch never takes focus, so without this the first click on a button only "activates"
+/// the window instead of pressing the button (e.g. Clear seemed to do nothing).
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

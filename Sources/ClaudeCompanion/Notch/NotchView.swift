@@ -40,8 +40,9 @@ struct NotchRootView: View {
     private func content(_ layout: NotchLayout) -> some View {
         switch layout.kind {
         case .idle: IdleContent()
-        case .working(let activity): WorkingContent(showActivity: activity)
+        case .working: WorkingContent()
         case .alert: AlertContent()
+        case .alertCompact: CompactAlertContent()
         case .expanded: ExpandedContent()
         }
     }
@@ -68,31 +69,54 @@ private struct IdleContent: View {
 private struct WorkingContent: View {
     @EnvironmentObject var state: AppState
     @EnvironmentObject var model: NotchModel
-    let showActivity: Bool
 
     var body: some View {
         let session = state.focusSession
-        VStack(spacing: 0) {
+        let project = session?.project ?? "Working"
+        // The current action if live activity is on, else the project; full details are one hover away.
+        let text = model.isPrivate ? "Working"
+            : (state.config.notch.liveActivity ? (session?.activity ?? project) : project)
+        HStack(spacing: 8) {
+            FlickView(mood: .working, size: 20)
+            Text(text)
+                .font(.system(size: 12, weight: .semibold)).lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: 140, alignment: .leading)
+                .id(text)
+                .transition(.opacity)
+                .help(project)
+            Spacer(minLength: model.geometry.hasNotch ? model.geometry.notchWidth : 12)
+            if let s = session {
+                Text(s.startedAt, style: .timer).font(.number(12, weight: .semibold)).monospacedDigit()
+            }
+            Circle().fill(state.config.color(for: session?.accountID ?? state.activeAccount.id)).frame(width: 8, height: 8)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: model.geometry.hasNotch ? model.geometry.height : model.geometry.height - 4)
+        .animation(.easeInOut(duration: 0.25), value: text)
+    }
+}
+
+/// A permission request folded into the menu bar: still visible, no longer in your way.
+private struct CompactAlertContent: View {
+    @EnvironmentObject var state: AppState
+    @EnvironmentObject var model: NotchModel
+
+    var body: some View {
+        if let alert = model.alert {
             HStack(spacing: 8) {
-                FlickView(mood: .working, size: 22)
-                Text(model.isPrivate ? "Working" : (session?.project ?? "Working"))
+                FlickView(mood: alert.mood, size: 20)
+                Text(model.isPrivate ? "Claude needs you" : alert.title)
                     .font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                Spacer(minLength: model.geometry.hasNotch ? model.geometry.notchWidth : 16)
-                if let s = session {
-                    Text(s.startedAt, style: .timer).font(.number(12, weight: .semibold)).monospacedDigit()
+                    .frame(maxWidth: 140, alignment: .leading)
+                Spacer(minLength: model.geometry.hasNotch ? model.geometry.notchWidth : 12)
+                if let location = alert.location, location.appBundleID != nil {
+                    Button("Open") { Navigator.go(to: location); model.dismiss(alert.id) }
+                        .buttonStyle(NotchPill(prominent: true, compact: true))
                 }
-                Circle().fill(state.config.color(for: session?.accountID ?? state.activeAccount.id)).frame(width: 8, height: 8)
+                Circle().fill(Color(hex: 0xEB6834)).frame(width: 8, height: 8)
             }
             .padding(.horizontal, 12)
-            .frame(height: model.geometry.height)
-            if showActivity, let activity = session?.activity {
-                Text(activity)
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
-                    .lineLimit(1).truncationMode(.tail)
-                    .padding(.horizontal, 16).padding(.bottom, 6)
-                    .id(activity)
-                    .transition(.opacity)
-            }
+            .frame(height: model.geometry.hasNotch ? model.geometry.height : model.geometry.height - 4)
         }
     }
 }
@@ -227,100 +251,133 @@ private struct ClaudeTab: View {
     @EnvironmentObject var model: NotchModel
 
     var body: some View {
-        let usage = state.usage[state.activeAccount.id] ?? .empty
-        let block = usage.currentBlock
-        let line = state.statusLine
+        let _ = state.statusTick
+        let missing = Demo.isOn ? [] : state.config.accounts.filter { !Integration.hooksUpToDate(for: $0) }
         HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                let _ = state.statusTick
-                let missing = Demo.isOn ? [] : state.config.accounts.filter { !Integration.hooksUpToDate(for: $0) }
+            // Left: what you act on most: the account, then a compact usage line.
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    ForEach(state.config.accounts) { a in
+                        let active = a.id == state.config.activeAccountID
+                        let color = state.config.color(for: a.id)
+                        Button { withAnimation(.spring(response: 0.3)) { state.activate(a.id) } } label: {
+                            VStack(spacing: 5) {
+                                Circle().fill(color).frame(width: 36, height: 36)
+                                    .overlay(Image(systemName: a.symbol).font(.system(size: 14, weight: .semibold)))
+                                    .overlay(Circle().stroke(color, lineWidth: 2).padding(-4).opacity(active ? 1 : 0))
+                                    .overlay(alignment: .topTrailing) {
+                                        if state.needsYou(a.id) {
+                                            Circle().fill(Color(hex: 0xEB6834)).frame(width: 10, height: 10)
+                                                .overlay(Circle().stroke(Color.black, lineWidth: 2)).offset(x: 3, y: -3)
+                                        }
+                                    }
+                                Text(a.name).font(.system(size: 11, weight: active ? .semibold : .regular))
+                                    .foregroundStyle(active ? .white : .white.opacity(0.65)).lineLimit(1)
+                            }
+                            .frame(width: 64)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(active ? Color.white.opacity(0.1) : .clear))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(active ? "\(a.name) is active" : "Switch to \(a.name)")
+                    }
+                }
+                UsageLine()
                 if !missing.isEmpty {
                     HStack(spacing: 8) {
                         Image(systemName: "bolt.slash.fill").foregroundStyle(Ember.ring)
                         Text(missing.contains { Integration.hooksInstalled(for: $0) } ? "Hooks need an update" : "Hooks not installed")
-                            .font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                            .font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        Spacer(minLength: 0)
                         Button(missing.contains { Integration.hooksInstalled(for: $0) } ? "Update" : "Install") { state.installAllHooks() }
                             .buttonStyle(NotchPill(prominent: true))
                     }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: 0xEB6834).opacity(0.2)))
-                }
-                HStack(spacing: 10) {
-                    FlickView(mood: state.mood, size: 50)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(line.title).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                        Text(model.isPrivate ? " " : line.subtitle).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Account").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
-                    HStack(spacing: 6) {
-                        ForEach(state.config.accounts) { a in
-                            let active = a.id == state.config.activeAccountID
-                            Button { withAnimation(.spring(response: 0.3)) { state.activate(a.id) } } label: {
-                                Text(a.name).font(.system(size: 12, weight: active ? .semibold : .regular))
-                                    .padding(.horizontal, 10).padding(.vertical, 6)
-                                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                        .fill(active ? state.config.color(for: a.id) : Color.white.opacity(0.1)))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
             }
-            .frame(width: 230, alignment: .leading)
+            .frame(width: 236, alignment: .leading)
 
-            VStack(spacing: 4) {
-                ZStack {
-                    Circle().stroke(Color.white.opacity(0.12), lineWidth: 8)
-                    Circle()
-                        .trim(from: 0, to: block.map { min(1, Date().timeIntervalSince($0.start) / (5 * 3600)) } ?? 0)
-                        .stroke(Ember.ring, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 0) {
-                        Text(Fmt.usd(block?.cost ?? 0)).font(.number(15))
-                        Text(block.map { Fmt.remaining(until: $0.end) + " left" } ?? "no window")
-                            .font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-                .frame(width: 92, height: 92)
-                Text("5-hour window").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
-            }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.06)))
-
-            VStack(spacing: 8) {
-                let sessions = Array(state.sessions.values.sorted { a, b in
-                    let la = a.mood == .needs || a.mood == .working, lb = b.mood == .needs || b.mood == .working
-                    return la != lb ? la : a.date > b.date
-                }.prefix(3))
-                if sessions.isEmpty {
-                    Text("No sessions yet").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                ForEach(sessions) { s in
-                    HStack(spacing: 10) {
-                        Circle().fill(s.mood == .needs ? Color(hex: 0xEB6834) : state.config.color(for: s.accountID)).frame(width: 8, height: 8)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(model.isPrivate ? (state.config.account(s.accountID)?.name ?? "Session") : s.project)
-                                .font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                            Text(detail(s)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-                        }
-                        Spacer(minLength: 4)
-                        if s.mood == .working {
-                            Text(s.startedAt, style: .timer).font(.number(12, weight: .semibold)).monospacedDigit()
-                        }
-                        if s.location.appBundleID != nil {
-                            Button("Open") { Navigator.go(to: s.location) }.buttonStyle(NotchPill(prominent: s.mood == .needs))
-                        }
-                    }
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(s.mood == .needs ? Color(hex: 0xEB6834).opacity(0.22) : Color.white.opacity(0.06)))
-                }
-            }
-            .frame(maxWidth: .infinity)
+            // Right: the sessions, the thing you come here for.
+            SessionsColumn()
         }
+    }
+}
+
+/// "5h window ▬▬▬▭ $12.60 · resets 19:00 · today $24.78" in one line.
+private struct UsageLine: View {
+    @EnvironmentObject var state: AppState
+    var body: some View {
+        let usage = state.usage[state.activeAccount.id] ?? .empty
+        let block = usage.currentBlock
+        let fraction = block.map { min(1, Date().timeIntervalSince($0.start) / (5 * 3600)) } ?? 0
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("5-hour window").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                Spacer()
+                Text(block.map { "resets \($0.end.formatted(date: .omitted, time: .shortened))" } ?? "not started")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.12))
+                    Capsule().fill(Ember.ring).frame(width: max(6, geo.size.width * fraction))
+                }
+            }
+            .frame(height: 6)
+            HStack(spacing: 6) {
+                Text(Fmt.usd(block?.cost ?? 0)).font(.number(13, weight: .semibold))
+                Text("this window").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                Spacer()
+                Text("today \(Fmt.usd(usage.cost(since: Calendar.current.startOfDay(for: Date()))))")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.06)))
+    }
+}
+
+private struct SessionsColumn: View {
+    @EnvironmentObject var state: AppState
+    @EnvironmentObject var model: NotchModel
+
+    var body: some View {
+        let sessions = Array(state.sessions.values.sorted { a, b in
+            let la = a.mood == .needs ? 0 : a.mood == .working ? 1 : 2
+            let lb = b.mood == .needs ? 0 : b.mood == .working ? 1 : 2
+            return la != lb ? la < lb : a.date > b.date
+        }.prefix(3))
+        VStack(spacing: 6) {
+            if sessions.isEmpty {
+                VStack(spacing: 8) {
+                    FlickView(mood: .sleep, size: 40, animated: false)
+                    Text("No sessions yet. I'll show them here.").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            ForEach(sessions) { s in
+                HStack(spacing: 10) {
+                    FlickView(mood: s.mood == .done ? .done : s.mood, size: 26, animated: s.mood == .working || s.mood == .needs)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(model.isPrivate ? (state.config.account(s.accountID)?.name ?? "Session") : s.project)
+                            .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        Text(detail(s)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    if s.mood == .working {
+                        Text(s.startedAt, style: .timer).font(.number(12, weight: .semibold)).monospacedDigit()
+                    }
+                    if s.location.appBundleID != nil {
+                        Button("Open") { Navigator.go(to: s.location) }.buttonStyle(NotchPill(prominent: s.mood == .needs))
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(s.mood == .needs ? Color(hex: 0xEB6834).opacity(0.22) : Color.white.opacity(0.06)))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func detail(_ s: SessionStatus) -> String {
@@ -341,38 +398,62 @@ private struct MusicTab: View {
             HStack(spacing: 18) {
                 Group {
                     if let url = t.artworkURL {
-                        AsyncImage(url: url) { img in img.resizable().scaledToFill() } placeholder: { artworkPlaceholder }
+                        AsyncImage(url: url) { img in img.resizable().scaledToFill() } placeholder: { placeholder }
                     } else {
-                        artworkPlaceholder
+                        placeholder
                     }
                 }
-                .frame(width: 150, height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(t.title).font(.system(size: 18, weight: .semibold)).lineLimit(2)
-                    Text(t.artist).font(.system(size: 14)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-                    Text(t.app).font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
-                    HStack(spacing: 26) {
-                        Button { music.command("previous track") } label: { Image(systemName: "backward.fill") }
-                        Button { music.command("playpause") } label: {
-                            Image(systemName: t.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 26))
+                .frame(width: 104, height: 104)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(t.title).font(.system(size: 17, weight: .semibold)).lineLimit(1)
+                    Text(t.artist).font(.system(size: 13)).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
+                    if t.duration > 0 { TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        let pos = t.currentPosition(at: ctx.date)
+                        VStack(spacing: 4) {
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.15))
+                                    Capsule().fill(Color.white).frame(width: t.duration > 0 ? geo.size.width * pos / t.duration : 0)
+                                }
+                            }
+                            .frame(height: 5)
+                            HStack {
+                                Text(time(pos)); Spacer(); Text("-" + time(max(0, t.duration - pos)))
+                            }
+                            .font(.system(size: 10, design: .rounded).monospacedDigit()).foregroundStyle(.white.opacity(0.55))
                         }
-                        Button { music.command("next track") } label: { Image(systemName: "forward.fill") }
                     }
-                    .font(.system(size: 18))
-                    .buttonStyle(.plain)
-                    .padding(.top, 12)
+                    .padding(.top, 8) }
+                    Text("Playing in \(t.app)").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 22) {
+                    Button { music.command("previous track") } label: { Image(systemName: "backward.fill").font(.system(size: 20)) }
+                    Button { music.command("playpause") } label: {
+                        Image(systemName: t.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 46))
+                    }
+                    Button { music.command("next track") } label: { Image(systemName: "forward.fill").font(.system(size: 20)) }
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 4)
         } else {
             EmptyNotchState(symbol: "music.note", text: "Nothing playing in Music or Spotify")
         }
     }
 
-    private var artworkPlaceholder: some View {
+    private var placeholder: some View {
         LinearGradient(colors: [Color(hex: 0x6250D6), Color(hex: 0xE87BA4)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            .overlay(Image(systemName: "music.note").font(.system(size: 40)).foregroundStyle(.white.opacity(0.8)))
+            .overlay(Image(systemName: "music.note").font(.system(size: 34)).foregroundStyle(.white.opacity(0.85)))
+    }
+
+    private func time(_ s: Double) -> String {
+        let t = Int(s.rounded())
+        return "\(t / 60):" + String(format: "%02d", t % 60)
     }
 }
 
@@ -380,47 +461,77 @@ private struct CalendarTab: View {
     @EnvironmentObject var calendar: CalendarProvider
 
     var body: some View {
-        switch calendar.access {
-        case .fullAccess:
-            if calendar.events.isEmpty {
-                EmptyNotchState(symbol: "calendar", text: "Nothing in the next 24 hours")
-            } else {
-                HStack(alignment: .top, spacing: 14) {
-                    ForEach(Array(calendar.events.enumerated()), id: \.element.id) { i, e in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(countdown(e)).font(.system(size: 12, weight: .semibold)).foregroundStyle(i == 0 ? Ember.ring : .white.opacity(0.6))
-                            Text(e.title).font(.system(size: i == 0 ? 17 : 14, weight: .semibold)).lineLimit(2)
-                            Text("\(e.start.formatted(date: .omitted, time: .shortened)) – \(e.end.formatted(date: .omitted, time: .shortened))")
-                                .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
-                            if let url = e.joinURL {
-                                Button("Join call") { NSWorkspace.shared.open(url) }
-                                    .buttonStyle(NotchPill(prominent: i == 0)).padding(.top, 6)
-                            }
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(i == 0 ? 0.1 : 0.05)))
+        HStack(alignment: .top, spacing: 18) {
+            // Today, always shown, so the tab never looks empty.
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Date().formatted(.dateTime.weekday(.wide)).capitalized)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Ember.ring)
+                Text(Date().formatted(.dateTime.day()))
+                    .font(.system(size: 52, weight: .semibold, design: .rounded))
+                Text(Date().formatted(.dateTime.month(.wide).year())).font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+            }
+            .frame(width: 120, alignment: .leading)
+
+            Group {
+                switch calendar.access {
+                case .fullAccess: events
+                case .notDetermined:
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("See your next meetings here, with a button to join the call.").font(.system(size: 13))
+                        Button("Allow Calendar Access") { calendar.requestAccess() }.buttonStyle(NotchPill(prominent: true))
                     }
+                default:
+                    Text("Calendar access is off. Turn it on in System Settings › Privacy & Security › Calendars.")
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
                 }
             }
-        case .notDetermined:
-            VStack(spacing: 10) {
-                Image(systemName: "calendar").font(.system(size: 28)).foregroundStyle(.white.opacity(0.6))
-                Text("See your next meeting here").font(.system(size: 13))
-                Button("Allow Calendar Access") { calendar.requestAccess() }.buttonStyle(NotchPill(prominent: true))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        default:
-            EmptyNotchState(symbol: "calendar.badge.exclamationmark",
-                            text: "Calendar access is off. Turn it on in System Settings › Privacy & Security › Calendars.")
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 
-    private func countdown(_ e: CalendarProvider.Event) -> String {
+    @ViewBuilder private var events: some View {
+        let cal = Calendar.current
+        let today = calendar.events.filter { cal.isDateInToday($0.start) || $0.start < Date() }
+        let later = calendar.events.filter { !(cal.isDateInToday($0.start) || $0.start < Date()) }
+        VStack(alignment: .leading, spacing: 6) {
+            if today.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x1BAF7A))
+                    Text("Nothing else today").font(.system(size: 14, weight: .semibold))
+                }
+                .padding(.bottom, 2)
+            }
+            ForEach(Array((today + later).prefix(3).enumerated()), id: \.element.id) { i, e in
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2).fill(i == 0 && !today.isEmpty ? Ember.ring : Color.white.opacity(0.3))
+                        .frame(width: 3, height: 32)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(e.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        Text(when(e)).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                    }
+                    Spacer(minLength: 6)
+                    if let url = e.joinURL {
+                        Button("Join") { NSWorkspace.shared.open(url) }.buttonStyle(NotchPill(prominent: i == 0 && !today.isEmpty))
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(i == 0 ? 0.09 : 0.05)))
+            }
+            if calendar.events.isEmpty {
+                Text("Nothing in the next 7 days either.").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+    }
+
+    private func when(_ e: CalendarProvider.Event) -> String {
+        let cal = Calendar.current
+        let range = "\(e.start.formatted(date: .omitted, time: .shortened)) – \(e.end.formatted(date: .omitted, time: .shortened))"
         let minutes = Int(e.start.timeIntervalSinceNow / 60)
-        if minutes <= 0 { return "Now" }
-        if minutes < 60 { return "In \(minutes) min" }
-        return e.start.formatted(.relative(presentation: .named)).capitalized
+        if minutes <= 0 { return "Now · " + range }
+        if minutes < 60 { return "In \(minutes) min · " + range }
+        if cal.isDateInToday(e.start) { return "Today · " + range }
+        if cal.isDateInTomorrow(e.start) { return "Tomorrow · " + range }
+        return e.start.formatted(.dateTime.weekday(.wide)).capitalized + " · " + range
     }
 }
 
@@ -508,7 +619,7 @@ private struct ClipboardTab: View {
                 HStack {
                     Text("Click to copy again · kept in memory only").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
                     Spacer()
-                    Button("Clear") { clipboard.clear() }.buttonStyle(NotchPill())
+                    Button("Clear History") { withAnimation { clipboard.clear() } }.buttonStyle(NotchPill())
                 }
             }
         }
@@ -536,12 +647,14 @@ private struct EmptyNotchState: View {
 struct NotchPill: ButtonStyle {
     var prominent = false
     var round = false
+    /// Fits inside the menu bar height.
+    var compact = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: compact ? 11 : 12, weight: .semibold))
             .foregroundStyle(.white)
-            .padding(.horizontal, round ? 0 : 12)
-            .padding(.vertical, round ? 0 : 6)
+            .padding(.horizontal, round ? 0 : (compact ? 8 : 12))
+            .padding(.vertical, round ? 0 : (compact ? 2 : 6))
             .frame(width: round ? 26 : nil, height: round ? 26 : nil)
             .background(
                 Group {

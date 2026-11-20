@@ -95,7 +95,7 @@ enum Demo {
         }
         if phase.hasPrefix("working") { state.sessions["personal-today"]?.activity = "Editing HeroSection.swift" }
         notch.apply(state)
-        notch.music.demoTrack = .init(app: "Spotify", title: "[Track title]", artist: "[Artist]", artworkURL: nil, isPlaying: true)
+        notch.music.demoTrack = .init(app: "Spotify", title: "[Track title]", artist: "[Artist]", artworkURL: nil, isPlaying: true, position: 72, duration: 214)
         notch.calendar.demo = true
         notch.calendar.access = .fullAccess
         let now = Date()
@@ -107,8 +107,16 @@ enum Demo {
         notch.shelf.items = ["report.pdf", "screenshot.png", "notes.md"].map { URL(fileURLWithPath: "/System/Library/CoreServices/\($0)") }
         notch.clipboard.clips = ["git checkout -b fix/login", "https://github.com/acme/app/pull/42", "#D9653B", "Ship it after the review"]
             .enumerated().map { .init(text: $1, date: now.addingTimeInterval(-Double($0 * 400 + 60))) }
+        if phase == "expanded-calendar-free" {
+            notch.calendar.events = [
+                .init(id: "3", title: "Team standup", start: Calendar.current.startOfDay(for: now).addingTimeInterval(33 * 3600),
+                      end: Calendar.current.startOfDay(for: now).addingTimeInterval(33.25 * 3600), joinURL: URL(string: "https://meet.google.com/demo")),
+                .init(id: "4", title: "Sprint planning", start: Calendar.current.startOfDay(for: now).addingTimeInterval(58 * 3600),
+                      end: Calendar.current.startOfDay(for: now).addingTimeInterval(59 * 3600), joinURL: nil),
+            ]
+        }
         switch phase {
-        case "needs":
+        case "needs", "needs-folded":
             notch.model.show(NotchAlert(id: "work-today", title: "Work needs a hand", subtitle: "Work · billing-api",
                                         body: "Claude needs your permission to use Bash", mood: .needs,
                                         location: state.sessions["work-today"]?.location, stays: true))
@@ -118,7 +126,7 @@ enum Demo {
                                         location: state.sessions["personal-3"]?.location, copyText: "…", stays: true))
         default:
             if phase.hasPrefix("expanded") {
-                notch.model.tab = NotchTab(rawValue: String(phase.dropFirst("expanded-".count))) ?? .claude
+                notch.model.tab = NotchTab(rawValue: String(phase.dropFirst("expanded-".count).prefix { $0 != "-" })) ?? .claude
                 notch.model.expanded = true
             }
         }
