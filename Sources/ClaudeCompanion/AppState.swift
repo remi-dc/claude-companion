@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
             Integration.writeWrapperData(config)
             if config.shortcuts != oldValue.shortcuts { registerShortcuts() }
             if config.notch != oldValue.notch { NotchController.shared.apply(self) }
+            if config.keepAwake != oldValue.keepAwake { updateKeepAwake() }
         }
     }
     /// Shortcuts another app already uses (couldn't be registered).
@@ -24,7 +25,9 @@ final class AppState: ObservableObject {
     @Published var statusTick = 0
     @Published var notificationPermission: Notifier.Permission = .unknown
     /// Live state per Claude session, keyed by session id.
-    @Published var sessions: [String: SessionStatus] = [:]
+    @Published var sessions: [String: SessionStatus] = [:] {
+        didSet { updateKeepAwake() }
+    }
     /// Ticks while Claude is working, to animate the menu bar icon.
     @Published var iconFrame = 0
     /// Refreshed periodically so time-based states (done → idle) move on.
@@ -79,7 +82,7 @@ final class AppState: ObservableObject {
         registerShortcuts()
         DispatchQueue.main.async { NotchController.shared.apply(self) }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshUsage(); self?.refreshPermission(); self?.now = Date() }
+            Task { @MainActor in self?.refreshUsage(); self?.refreshPermission(); self?.now = Date(); self?.updateKeepAwake() }
         }
         iconTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -104,6 +107,13 @@ final class AppState: ObservableObject {
 
     var liveSessions: [SessionStatus] {
         sessions.values.filter(isLive).sorted { $0.date > $1.date }
+    }
+
+    /// Stay awake while a session is working or waiting for you; sleep normally otherwise.
+    func updateKeepAwake() {
+        guard !Demo.isOn else { return }
+        let busy = liveSessions.contains { $0.mood == .working || $0.mood == .needs }
+        KeepAwake.set(config.keepAwake && busy)
     }
 
     /// Flick's colors from Settings › Flick ("account" follows the active account).

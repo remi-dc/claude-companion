@@ -192,6 +192,17 @@ private struct GeneralPane: View {
                 .pickerStyle(.segmented)
             }
 
+            Section {
+                Toggle(isOn: $state.config.keepAwake) {
+                    RowLabel(title: "Keep the Mac awake while Claude works",
+                             detail: "Claude keeps going when you step away: the screen still locks and turns off, so your work stays private, and notifications keep coming. Back to normal sleep as soon as Claude is done.")
+                }
+            } header: {
+                Text("Energy")
+            } footer: {
+                Text("Closing the lid on battery still puts the Mac to sleep; that's macOS's rule. On power with an external display, it keeps going.")
+            }
+
             Section("Menu bar") {
                 Picker(selection: $state.config.menuBarAccount) {
                     Text("Name").tag("name")

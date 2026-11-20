@@ -113,6 +113,8 @@ struct CompanionConfig: Codable {
     var menuBarAccount = "name"
     var notch = NotchSettings()
     var phone = PhoneSettings()
+    /// Don't let the Mac sleep while Claude works or waits for you (the screen can still lock and turn off).
+    var keepAwake = true
 
     /// The account a folder rule assigns to `path`, if any.
     func ruleAccount(for path: String) -> Account? {
@@ -154,6 +156,7 @@ struct CompanionConfig: Codable {
         menuBarAccount = (try? c.decodeIfPresent(String.self, forKey: .menuBarAccount)) ?? (showAccountInMenuBar ? "name" : "off")
         notch = (try? c.decodeIfPresent(NotchSettings.self, forKey: .notch)) ?? NotchSettings()
         phone = (try? c.decodeIfPresent(PhoneSettings.self, forKey: .phone)) ?? PhoneSettings()
+        keepAwake = (try? c.decodeIfPresent(Bool.self, forKey: .keepAwake)) ?? true
     }
 
     static var defaults: CompanionConfig {
