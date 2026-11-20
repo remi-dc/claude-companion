@@ -97,6 +97,7 @@ struct CompanionConfig: Codable {
     var alerts = AlertSettings()
     /// Action id → shortcut. A missing entry means the shortcut is off.
     var shortcuts: [String: Shortcut] = Shortcut.defaults
+    var knownShortcutActions: [String] = Shortcut.actions.map(\.id)
     var flick = FlickSettings()
     /// Event → "banner" (disappears) or "sticky" (stays on screen until dismissed or resolved).
     var notificationStyles: [String: String] = ["permission": "sticky"]
@@ -111,6 +112,7 @@ struct CompanionConfig: Codable {
     /// How the menu bar shows the active account: "name" (e.g. "School"), "dot" (its color) or "off".
     var menuBarAccount = "name"
     var notch = NotchSettings()
+    var phone = PhoneSettings()
 
     /// The account a folder rule assigns to `path`, if any.
     func ruleAccount(for path: String) -> Account? {
@@ -139,6 +141,11 @@ struct CompanionConfig: Codable {
         friendlyMessages = try c.decodeIfPresent(Bool.self, forKey: .friendlyMessages) ?? true
         alerts = (try? c.decodeIfPresent(AlertSettings.self, forKey: .alerts)) ?? AlertSettings()
         shortcuts = (try? c.decodeIfPresent([String: Shortcut].self, forKey: .shortcuts)) ?? Shortcut.defaults
+        // Give shortcuts added in later versions their default, without re-enabling ones you turned off.
+        let known = (try? c.decodeIfPresent([String].self, forKey: .knownShortcutActions))
+            ?? ["account1", "account2", "account3", "popover", "sessions"]
+        for (id, s) in Shortcut.defaults where !known.contains(id) && shortcuts[id] == nil { shortcuts[id] = s }
+        knownShortcutActions = Shortcut.actions.map(\.id)
         flick = (try? c.decodeIfPresent(FlickSettings.self, forKey: .flick)) ?? FlickSettings()
         notificationStyles = (try? c.decodeIfPresent([String: String].self, forKey: .notificationStyles)) ?? ["permission": "sticky"]
         folderRules = (try? c.decodeIfPresent([FolderRule].self, forKey: .folderRules)) ?? []
@@ -146,6 +153,7 @@ struct CompanionConfig: Codable {
         showAccountInMenuBar = (try? c.decodeIfPresent(Bool.self, forKey: .showAccountInMenuBar)) ?? true
         menuBarAccount = (try? c.decodeIfPresent(String.self, forKey: .menuBarAccount)) ?? (showAccountInMenuBar ? "name" : "off")
         notch = (try? c.decodeIfPresent(NotchSettings.self, forKey: .notch)) ?? NotchSettings()
+        phone = (try? c.decodeIfPresent(PhoneSettings.self, forKey: .phone)) ?? PhoneSettings()
     }
 
     static var defaults: CompanionConfig {
@@ -225,6 +233,7 @@ struct Shortcut: Codable, Equatable {
     static let actions: [(id: String, title: String)] = [
         ("account1", "Switch to account 1"), ("account2", "Switch to account 2"), ("account3", "Switch to account 3"),
         ("popover", "Open Claude Companion"), ("sessions", "Show sessions"),
+        ("command", "Ask Claude (command bar)"), ("projects", "Projects and history"),
     ]
 
     // Carbon modifier bits: cmd 256, shift 512, option 2048, control 4096. Key codes: 1→18, 2→19, 3→20, C→8, S→1.
@@ -234,6 +243,8 @@ struct Shortcut: Codable, Equatable {
         "account3": Shortcut(keyCode: 20, modifiers: 2048 | 256, display: "⌥⌘3"),
         "popover": Shortcut(keyCode: 8, modifiers: 2048 | 256, display: "⌥⌘C"),
         "sessions": Shortcut(keyCode: 1, modifiers: 2048 | 256, display: "⌥⌘S"),
+        "command": Shortcut(keyCode: 40, modifiers: 2048 | 256, display: "⌥⌘K"),
+        "projects": Shortcut(keyCode: 35, modifiers: 2048 | 256, display: "⌥⌘P"),
     ]
 }
 
@@ -310,5 +321,45 @@ struct NotchSettings: Codable, Equatable {
         calendarTab = (try? c.decodeIfPresent(Bool.self, forKey: .calendarTab)) ?? d.calendarTab
         shelfTab = (try? c.decodeIfPresent(Bool.self, forKey: .shelfTab)) ?? d.shelfTab
         clipboardTab = (try? c.decodeIfPresent(Bool.self, forKey: .clipboardTab)) ?? d.clipboardTab
+    }
+}
+
+// MARK: Phone
+
+/// Push notifications to your phone through ntfy (https://ntfy.sh, or your own server).
+struct PhoneSettings: Codable, Equatable {
+    var enabled = false
+    var server = "https://ntfy.sh"
+    /// A long random topic: anyone who knows it can read the messages, so it acts as a password.
+    var topic = "claude-companion-" + String((0..<20).map { _ in "abcdefghijkmnpqrstuvwxyz23456789".randomElement()! })
+    /// Only when you're away from the Mac (idle or locked).
+    var onlyWhenAway = true
+    var awayMinutes = 5
+    var permission = true
+    var finished = true
+    var waiting = false
+    var alerts = true
+    /// Include Claude's message text (it then passes through the ntfy server).
+    var includeText = false
+
+    var topicURL: URL? {
+        URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) + "/" + topic)
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = PhoneSettings()
+        enabled = (try? c.decodeIfPresent(Bool.self, forKey: .enabled)) ?? d.enabled
+        server = (try? c.decodeIfPresent(String.self, forKey: .server)) ?? d.server
+        topic = (try? c.decodeIfPresent(String.self, forKey: .topic)) ?? d.topic
+        onlyWhenAway = (try? c.decodeIfPresent(Bool.self, forKey: .onlyWhenAway)) ?? d.onlyWhenAway
+        awayMinutes = (try? c.decodeIfPresent(Int.self, forKey: .awayMinutes)) ?? d.awayMinutes
+        permission = (try? c.decodeIfPresent(Bool.self, forKey: .permission)) ?? d.permission
+        finished = (try? c.decodeIfPresent(Bool.self, forKey: .finished)) ?? d.finished
+        waiting = (try? c.decodeIfPresent(Bool.self, forKey: .waiting)) ?? d.waiting
+        alerts = (try? c.decodeIfPresent(Bool.self, forKey: .alerts)) ?? d.alerts
+        includeText = (try? c.decodeIfPresent(Bool.self, forKey: .includeText)) ?? d.includeText
     }
 }

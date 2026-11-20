@@ -132,6 +132,10 @@ final class AppState: ObservableObject {
             if config.notch.menuBarOn { HotKeys.togglePopover() } else { NotchController.shared.toggleExpanded() }
         case "sessions":
             WindowManager.shared.show("sessions", state: self)
+        case "projects":
+            WindowManager.shared.show("projects", state: self)
+        case "command":
+            CommandBar.shared.toggle(self)
         default:
             break
         }
@@ -193,6 +197,7 @@ final class AppState: ObservableObject {
     /// One place for usage alerts and confirmations: the notch, or a macOS notification.
     func presentAlert(id: String = UUID().uuidString, title: String, body: String, mood: FlickMood,
                       account: Account? = nil, sound: String? = "Tink") {
+        if id != "switch" { Phone.maybeSend(.alert, title: title, body: body, settings: config.phone) }
         if notchShowsNotifications {
             if let sound { Sounds.play(sound) }
             NotchController.shared.model.show(NotchAlert(id: id, title: title, subtitle: account?.name ?? "Claude Companion",
@@ -291,6 +296,15 @@ final class AppState: ObservableObject {
         if recent.count > 30 { recent.removeLast(recent.count - 30) }
         let account = config.account(msg.accountID)
         guard !config.paused, account?.notificationsEnabled != false else { return }
+        // Your phone, when you're away (Settings › Phone).
+        let who = account?.name ?? msg.accountID
+        switch msg.event {
+        case .permission: Phone.maybeSend(.permission, title: "\(who) needs a hand · \(msg.project)", body: msg.body, settings: config.phone)
+        case .finished: Phone.maybeSend(.finished, title: "\(msg.project) is ready · \(who)", body: msg.body, settings: config.phone)
+        case .waiting: Phone.maybeSend(.waiting, title: "Waiting for you · \(msg.project)", body: msg.body, settings: config.phone)
+        case .started: break
+        }
+
         if notchShowsNotifications {
             if let account { Sounds.play(account.sound(for: msg.event)) }
             let mood: FlickMood = msg.event == .permission ? .needs : .done

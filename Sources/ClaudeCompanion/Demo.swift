@@ -75,6 +75,25 @@ enum Demo {
         return Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
     }
 
+    /// Made-up conversations for the Projects window screenshots.
+    static func conversations(now: Date = Date()) -> [Conversation] {
+        let items: [(String, String, String, Double, Int)] = [
+            ("work", "/demo/billing-api", "Add retry logic to the payment webhook handler", 0.4, 18),
+            ("work", "/demo/billing-api", "Migrate invoices table to the new schema", 26, 42),
+            ("work", "/demo/data-pipeline", "Speed up the nightly export job", 50, 23),
+            ("personal", "/demo/landing-page", "Redesign the hero section with the new brand colors", 0.1, 31),
+            ("personal", "/demo/notes-app", "Add offline sync and update the tests", 3, 27),
+            ("personal", "/demo/landing-page", "Fix layout shift on mobile Safari", 75, 9),
+            ("backup", "/demo/docs-site", "Fix the broken links in the API reference", 30, 6),
+        ]
+        return items.enumerated().map { i, it in
+            let last = now.addingTimeInterval(-it.3 * 3600)
+            return Conversation(id: "demo-\(i)", accountID: it.0, project: it.1, title: it.2,
+                                firstDate: last.addingTimeInterval(-1800), lastDate: last, messageCount: it.4,
+                                file: URL(fileURLWithPath: "/tmp/demo-\(i).jsonl"), searchText: it.2.lowercased())
+        }
+    }
+
     static func recent(now: Date = Date()) -> [HookMessage] {
         [HookMessage(date: now.addingTimeInterval(-180), accountID: "personal", event: .finished, project: "notes-app",
                      body: "Added offline sync and updated the tests.", sessionID: "personal-3"),
@@ -139,6 +158,26 @@ enum Demo {
 
     @MainActor
     static func run(_ state: AppState) {
+        if settingsPane == "projects" || settingsPane == "command" {
+            NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+            HistoryIndex.shared.refresh(accounts: state.config.accounts)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                if settingsPane == "projects" {
+                    WindowManager.shared.show("projects", state: state)
+                } else {
+                    CommandBar.shared.show(state)
+                    CommandBar.shared.model.showDemo(prompt: "What does the retry logic in the webhook handler do?",
+                        answer: "It retries a failed payment webhook **up to 5 times** with exponential backoff (1 s, 2 s, 4 s, 8 s, 16 s). Each attempt reuses the same idempotency key, so a charge is never applied twice. After the last attempt, the event goes to the `failed_webhooks` table and an alert is sent.")
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    guard let dir = outDir else { return }
+                    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+                    let lines = NSApp.windows.filter { $0.isVisible && $0.frame.width > 300 }.map { "\($0.title)\t\($0.windowNumber)" }
+                    try? lines.joined(separator: "\n").write(toFile: dir + "/windows.txt", atomically: true, encoding: .utf8)
+                }
+            }
+            return
+        }
         if let pane = settingsPane, pane.hasPrefix("notch:") {
             runNotch(state, phase: String(pane.dropFirst("notch:".count)))
             return

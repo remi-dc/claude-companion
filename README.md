@@ -90,6 +90,23 @@ Pick **Menu bar**, **Notch** or **Both** in Settings › Notch. The notch grows 
 </td>
 <td width="50%" valign="top">
 
+### 🗂 Projects & history
+- Every **project** and **conversation** across accounts, with cost and date.
+- **Search** everything you and Claude wrote, then **Resume** on the right account.
+- A **command bar** (⌥⌘K): ask a quick question from anywhere, or start a session.
+
+</td>
+<td width="50%" valign="top">
+
+### 📱 Phone
+- Notifications on your **phone** with [ntfy](https://ntfy.sh) (free), only when you're away.
+- No message text unless you allow it; scan a QR code to connect.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
 ### ✨ Comfort
 - **Global shortcuts** you record yourself (⌥⌘1/2/3, ⌥⌘C, ⌥⌘S by default).
 - **Built-in updates**: one click, verified, relaunches itself.

@@ -216,6 +216,10 @@ private struct ExpandedContent: View {
                     .buttonStyle(.plain)
                 }
                 Spacer()
+                Button { CommandBar.shared.toggle(state) } label: { Image(systemName: "magnifyingglass") }
+                    .buttonStyle(NotchPill(round: true)).help("Ask Claude")
+                Button { WindowManager.shared.show("projects", state: state) } label: { Image(systemName: "folder") }
+                    .buttonStyle(NotchPill(round: true)).help("Projects and history")
                 Button { WindowManager.shared.show("dashboard", state: state) } label: { Image(systemName: "chart.bar.xaxis") }
                     .buttonStyle(NotchPill(round: true)).help("Dashboard")
                 Button { WindowManager.shared.show("settings", state: state) } label: { Image(systemName: "gearshape") }

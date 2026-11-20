@@ -20,6 +20,9 @@ final class WindowManager {
         case "settings":
             (title, size, view) = ("Settings", NSSize(width: 820, height: 600),
                                    AnyView(SettingsView().environmentObject(state).environmentObject(state.updater).tint(Ember.accent)))
+        case "projects":
+            (title, size, view) = ("Projects", NSSize(width: 980, height: 640),
+                                   AnyView(ProjectsView().environmentObject(state)))
         case "sessions":
             (title, size, view) = ("Sessions", NSSize(width: 560, height: 520),
                                    AnyView(SessionsView().environmentObject(state).tint(Ember.accent)))

@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var pane: Pane = Demo.settingsPane.flatMap(Pane.init(rawValue:)) ?? .general
 
     enum Pane: String, CaseIterable, Identifiable {
-        case general, notch, accounts, switching, notifications, alerts, shortcuts, setup, about
+        case general, notch, accounts, switching, notifications, phone, alerts, shortcuts, setup, about
         var id: String { rawValue }
 
         var title: String {
@@ -19,6 +19,7 @@ struct SettingsView: View {
             case .accounts: return "Accounts"
             case .switching: return "Switching"
             case .notifications: return "Notifications"
+            case .phone: return "Phone"
             case .alerts: return "Alerts"
             case .shortcuts: return "Shortcuts"
             case .setup: return "Setup"
@@ -33,6 +34,7 @@ struct SettingsView: View {
             case .accounts: return ("person.2.fill", Color(hex: 0x2A78D6))
             case .switching: return ("arrow.triangle.branch", Color(hex: 0x6250D6))
             case .notifications: return ("bell.badge.fill", Color(hex: 0xE34948))
+            case .phone: return ("iphone", Color(hex: 0x1BAF7A))
             case .alerts: return ("gauge.with.dots.needle.67percent", Color(hex: 0xE59A00))
             case .shortcuts: return ("command", Color(hex: 0x6E6E73))
             case .setup: return ("checklist", Color(hex: 0x1BAF7A))
@@ -59,7 +61,7 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 215, max: 240)
+            .navigationSplitViewColumnWidth(min: 215, ideal: 225, max: 260)
             .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
@@ -69,6 +71,7 @@ struct SettingsView: View {
                 case .accounts: AccountsPane()
                 case .switching: SwitchingPane()
                 case .notifications: NotificationsPane()
+                case .phone: PhonePane()
                 case .alerts: AlertsPane()
                 case .shortcuts: ShortcutsPane()
                 case .setup: SetupPane()
@@ -813,6 +816,83 @@ private struct NotchPane: View {
                     Text("Tabs")
                 } footer: {
                     Text("Music works with Music and Spotify (macOS asks once to let Claude Companion control them). Calendar asks for access the first time. The clipboard history stays in memory and skips anything apps mark as a password.")
+                }
+            }
+        }
+    }
+}
+
+// MARK: Phone
+
+private struct PhonePane: View {
+    @EnvironmentObject var state: AppState
+    @State private var testResult: String?
+
+    var body: some View {
+        let url = state.config.phone.topicURL?.absoluteString ?? ""
+        Form {
+            Section {
+                Toggle(isOn: $state.config.phone.enabled) {
+                    RowLabel(title: "Send notifications to my phone",
+                             detail: "With ntfy, a free app for iPhone and Android. Nothing to sign up for.")
+                }
+            }
+            if state.config.phone.enabled {
+                Section {
+                    HStack(alignment: .top, spacing: 16) {
+                        if let qr = Phone.qrCode(for: url) {
+                            Image(nsImage: qr).interpolation(.none).resizable().frame(width: 120, height: 120)
+                                .padding(6).background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("1. Install **ntfy** on your phone.")
+                            Text("2. Scan this code, or add this topic in the app:")
+                            Text(url).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                                .lineLimit(2).truncationMode(.middle)
+                            HStack {
+                                Button("Send a Test") {
+                                    testResult = "Sending…"
+                                    Phone.send(title: "Hello from Flick", body: "Claude Companion can reach your phone.",
+                                               settings: state.config.phone) { ok in
+                                        testResult = ok ? "Sent. Check your phone." : "Couldn't reach the server."
+                                    }
+                                }
+                                if let testResult { Text(testResult).font(.caption).foregroundStyle(.secondary) }
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
+                } header: {
+                    Text("Connect your phone")
+                } footer: {
+                    Text("The topic works like a password: anyone who knows it can read the messages. Keep it to yourself, or make a new one below.")
+                }
+
+                Section("When") {
+                    Toggle(isOn: $state.config.phone.onlyWhenAway) {
+                        RowLabel(title: "Only when I'm away from the Mac", detail: "When the screen is locked, or nothing was typed or clicked for a while.")
+                    }
+                    if state.config.phone.onlyWhenAway {
+                        Picker("Away after", selection: $state.config.phone.awayMinutes) {
+                            ForEach([1, 2, 5, 10, 15, 30], id: \.self) { Text("\($0) min").tag($0) }
+                        }
+                    }
+                    Toggle("Needs permission", isOn: $state.config.phone.permission)
+                    Toggle("Finished", isOn: $state.config.phone.finished)
+                    Toggle("Waiting for input", isOn: $state.config.phone.waiting)
+                    Toggle("Usage alerts", isOn: $state.config.phone.alerts)
+                }
+
+                Section {
+                    Toggle(isOn: $state.config.phone.includeText) {
+                        RowLabel(title: "Include Claude's message", detail: "Off: only “School needs a hand · billing-api”. On: the text too, which then goes through the ntfy server.")
+                    }
+                    TextField("Server", text: $state.config.phone.server)
+                    Button("Make a New Topic") { state.config.phone.topic = PhoneSettings().topic }
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("Use your own ntfy server for full privacy. A new topic stops messages reaching phones subscribed to the old one.")
                 }
             }
         }

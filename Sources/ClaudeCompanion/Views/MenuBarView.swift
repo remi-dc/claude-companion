@@ -353,10 +353,15 @@ struct MenuBarView: View {
                 Label("Dashboard", systemImage: "chart.bar.xaxis").frame(maxWidth: .infinity)
             }
             .buttonStyle(EmberPillStyle())
-            Button { WindowManager.shared.show("settings", state: state) } label: {
-                Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity)
+            Button { WindowManager.shared.show("projects", state: state) } label: {
+                Label("Projects", systemImage: "folder").frame(maxWidth: .infinity)
             }
             .buttonStyle(EmberPillStyle())
+            Button { WindowManager.shared.show("settings", state: state) } label: {
+                Image(systemName: "gearshape").frame(width: 30, height: 30)
+            }
+            .buttonStyle(EmberPillStyle(compact: true))
+            .help("Settings")
             Button { NSApp.terminate(nil) } label: {
                 Image(systemName: "power").frame(width: 30, height: 30)
             }
