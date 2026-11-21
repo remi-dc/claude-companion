@@ -864,7 +864,7 @@ private struct PhonePane: View {
                                 Button("Send a Test") {
                                     testResult = "Sending…"
                                     Phone.send(title: "Hello from Flick", body: "Claude Companion can reach your phone.",
-                                               settings: state.config.phone) { ok in
+                                               tags: "wave", settings: state.config.phone) { ok in
                                         testResult = ok ? "Sent. Check your phone." : "Couldn't reach the server."
                                     }
                                 }
@@ -903,6 +903,9 @@ private struct PhonePane: View {
                 Section {
                     Toggle(isOn: $state.config.phone.includeText) {
                         RowLabel(title: "Include Claude's message", detail: "Off: only “School needs a hand · billing-api”. On: the text too, which then goes through the ntfy server.")
+                    }
+                    Toggle(isOn: $state.config.phone.openClaudeOnTap) {
+                        RowLabel(title: "Tapping opens Claude", detail: "Opens claude.ai/code, where Remote Control lets you answer the session from your phone.")
                     }
                     TextField("Server", text: $state.config.phone.server)
                     Button("Make a New Topic") { state.config.phone.topic = PhoneSettings().topic }

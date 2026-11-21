@@ -344,6 +344,8 @@ struct PhoneSettings: Codable, Equatable {
     var alerts = true
     /// Include Claude's message text (it then passes through the ntfy server).
     var includeText = false
+    /// Tapping the notification opens Claude (claude.ai/code), e.g. to answer through Remote Control.
+    var openClaudeOnTap = true
 
     var topicURL: URL? {
         URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) + "/" + topic)
@@ -364,5 +366,6 @@ struct PhoneSettings: Codable, Equatable {
         waiting = (try? c.decodeIfPresent(Bool.self, forKey: .waiting)) ?? d.waiting
         alerts = (try? c.decodeIfPresent(Bool.self, forKey: .alerts)) ?? d.alerts
         includeText = (try? c.decodeIfPresent(Bool.self, forKey: .includeText)) ?? d.includeText
+        openClaudeOnTap = (try? c.decodeIfPresent(Bool.self, forKey: .openClaudeOnTap)) ?? d.openClaudeOnTap
     }
 }

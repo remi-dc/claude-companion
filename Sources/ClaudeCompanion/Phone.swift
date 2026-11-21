@@ -16,8 +16,12 @@ enum Phone {
         (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
+    static let iconURL = "https://raw.githubusercontent.com/remi-dc/claude-companion/main/docs/images/notify-icon.png"
+
+    /// Builds a tidy notification: a short title for what happened, "Account · project" underneath,
+    /// an emoji per kind (from ntfy tags), Flick's icon (Android) and a tap that opens Claude.
     @MainActor
-    static func maybeSend(_ kind: Kind, title: String, body: String?, settings s: PhoneSettings) {
+    static func maybeSend(_ kind: Kind, title: String, account: String?, project: String?, text: String?, settings s: PhoneSettings) {
         guard s.enabled else { return }
         switch kind {
         case .permission: guard s.permission else { return }
@@ -30,8 +34,18 @@ enum Phone {
             record("Skipped “\(title)”: you were at the Mac (idle \(Int(idle)) s, screen unlocked)")
             return
         }
-        send(title: title, body: (s.includeText ? body : nil) ?? "Open your Mac to see it.",
-             priority: kind == .permission ? 4 : 3, tags: kind == .permission ? "raised_hand" : "fire", settings: s) { ok in
+        var lines = [[account, project].compactMap { $0 }.joined(separator: " · ")].filter { !$0.isEmpty }
+        if s.includeText, let text, !text.isEmpty { lines.append(text) }
+        let style: (tag: String, priority: Int) = {
+            switch kind {
+            case .permission: return ("raised_hand", 4)
+            case .finished: return ("white_check_mark", 3)
+            case .waiting: return ("speech_balloon", 3)
+            case .alert: return ("bar_chart", 3)
+            }
+        }()
+        send(title: title, body: lines.isEmpty ? "Claude Companion" : lines.joined(separator: "\n\n"),
+             priority: style.priority, tags: style.tag, settings: s) { ok in
             record(ok ? "Sent “\(title)” (\(locked ? "screen locked" : "idle \(Int(idle)) s"))" : "Couldn't send “\(title)”: the server didn't answer")
         }
     }
@@ -54,8 +68,10 @@ enum Phone {
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let payload: [String: Any] = ["topic": s.topic, "title": String(title.prefix(200)),
-                                      "message": String(body.prefix(1000)), "priority": priority, "tags": [tags]]
+        var payload: [String: Any] = ["topic": s.topic, "title": String(title.prefix(200)),
+                                      "message": String(body.prefix(1000)), "priority": priority, "tags": [tags],
+                                      "icon": iconURL]
+        if s.openClaudeOnTap { payload["click"] = "https://claude.ai/code" }
         req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         URLSession.shared.dataTask(with: req) { _, response, error in
             let ok = error == nil && ((response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false)

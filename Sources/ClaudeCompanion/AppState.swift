@@ -207,7 +207,7 @@ final class AppState: ObservableObject {
     /// One place for usage alerts and confirmations: the notch, or a macOS notification.
     func presentAlert(id: String = UUID().uuidString, title: String, body: String, mood: FlickMood,
                       account: Account? = nil, sound: String? = "Tink") {
-        if id != "switch" { Phone.maybeSend(.alert, title: title, body: body, settings: config.phone) }
+        if id != "switch" { Phone.maybeSend(.alert, title: title, account: account?.name, project: nil, text: body, settings: config.phone) }
         if notchShowsNotifications {
             if let sound { Sounds.play(sound) }
             NotchController.shared.model.show(NotchAlert(id: id, title: title, subtitle: account?.name ?? "Claude Companion",
@@ -309,9 +309,9 @@ final class AppState: ObservableObject {
         // Your phone, when you're away (Settings › Phone).
         let who = account?.name ?? msg.accountID
         switch msg.event {
-        case .permission: Phone.maybeSend(.permission, title: "\(who) needs a hand · \(msg.project)", body: msg.body, settings: config.phone)
-        case .finished: Phone.maybeSend(.finished, title: "\(msg.project) is ready · \(who)", body: msg.body, settings: config.phone)
-        case .waiting: Phone.maybeSend(.waiting, title: "Waiting for you · \(msg.project)", body: msg.body, settings: config.phone)
+        case .permission: Phone.maybeSend(.permission, title: "\(who) needs your OK", account: who, project: msg.project, text: msg.body, settings: config.phone)
+        case .finished: Phone.maybeSend(.finished, title: "\(msg.project) is ready", account: who, project: msg.project, text: msg.body, settings: config.phone)
+        case .waiting: Phone.maybeSend(.waiting, title: "Claude is waiting for you", account: who, project: msg.project, text: msg.body, settings: config.phone)
         case .started: break
         }
 
