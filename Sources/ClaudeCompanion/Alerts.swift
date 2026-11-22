@@ -19,7 +19,8 @@ enum AlertsEngine {
                                account: alert.accountID.flatMap { state.config.account($0) })
         }
         if fired != before {
-            UserDefaults.standard.set(Array(fired).sorted().suffix(300), forKey: firedKey)
+            // Must be a real Array: an ArraySlice isn't a property list and made UserDefaults throw (crash).
+            UserDefaults.standard.set(Array(Array(fired).sorted().suffix(300)), forKey: firedKey)
         }
     }
 
